@@ -1,0 +1,2 @@
+https://huggingface.co/datasets/ag_news?download=1
+https://huggingface.co/sshleifer/tiny-gpt2

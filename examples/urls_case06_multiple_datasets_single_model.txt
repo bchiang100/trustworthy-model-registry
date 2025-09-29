@@ -1,0 +1,3 @@
+https://huggingface.co/datasets/hf-internal-testing/librispeech_dummy
+https://huggingface.co/datasets/hf-internal-testing/fixtures_image_utils
+https://huggingface.co/hf-internal-testing/tiny-random-bert

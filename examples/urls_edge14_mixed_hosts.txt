@@ -1,0 +1,4 @@
+https://huggingface.co/datasets/squad
+https://gitlab.com/huggingface-internal/example
+https://github.com/deepset-ai/haystack
+https://huggingface.co/deepset/roberta-base-squad2

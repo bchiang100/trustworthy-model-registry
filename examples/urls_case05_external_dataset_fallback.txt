@@ -1,0 +1,3 @@
+https://example.com/data/dummy.csv
+https://github.com/huggingface/evaluate
+https://huggingface.co/hf-internal-testing/tiny-random-t5
