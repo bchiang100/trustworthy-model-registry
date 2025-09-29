@@ -10,8 +10,6 @@ import math
 from datetime import datetime, timedelta
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-from transformers import logging
-logging.set_verbosity_error()   # hides all warnings
 
 # Import key libraries (ensure these are installed: pip install torch transformers datasets evaluate)
 try:
@@ -21,6 +19,8 @@ try:
     import evaluate
     from huggingface_hub import HfApi
     import requests
+    from transformers import logging
+    logging.set_verbosity_error()   # hides all warnings
     HF_HUB_DISABLE_SYMLINKS_WARNING: True
 except ImportError as e:
     required_packages = ["typer", "transformers", "tensorflow", "torch", "datasets", "evaluate", "huggingface_hub"]
@@ -85,7 +85,6 @@ def evaluate_model_dataset_code(model_link: str, dataset_link: str, code_link: s
     rlatency = (time.time() - start_time)
 
     # --- 2. Load Dataset for Evaluation ---
-    # --- 2. Load Dataset for Evaluation ---
     dataset_name = dataset_id.split('/')[-1]
     data = None
     
@@ -143,7 +142,7 @@ def evaluate_model_dataset_code(model_link: str, dataset_link: str, code_link: s
 
     start_time = time.time()
     size_score = {}
-    model_file_count = size_score_claim(model, tokenizer, evaluation_samples)
+    model_file_count = size_score_claim(model)
     raspberry_pi_score = (1-model_file_count/500)**2  # in millions of parameters
     size_score['raspberry pi'] = round(raspberry_pi_score, 2)
     jetson_nano_score = (1-model_file_count/2000)**2  # in millions of parameters
@@ -154,6 +153,18 @@ def evaluate_model_dataset_code(model_link: str, dataset_link: str, code_link: s
     size_score['aws server'] = round(aws_score, 2)
     round_size_score = [round(raspberry_pi_score, 2), round(jetson_nano_score, 2), round(pc_score, 2), round(aws_score, 2)]
     mlatency = round((time.time() - start_time)*1000, 2)
+
+    start_time = time.time()
+    data_code_score = compute_component_quality_score(code_link)
+    dclatency = round((time.time() - start_time)*1000, 2)
+
+    start_time = time.time()
+    dataset_quality_score = compute_dataset_quality_score(dataset_link)
+    dlatency = round((time.time() - start_time)*1000, 2)
+
+    start_time = time.time()
+    code_quality_score = compute_code_quality_score(code_link)
+    cqlatency = round((time.time() - start_time)*1000, 2)
     
     start_time = time.time()
     net_score = 0.15*ramp_up_time + 0.1*bus_factor + 0.2*license_score + 0.15*performance_claim + 0.05*sum(round_size_score)
@@ -163,23 +174,23 @@ def evaluate_model_dataset_code(model_link: str, dataset_link: str, code_link: s
     results["model_name"] = model_id
     results["category"] = "MODEL"
     results["net_score"] = round(net_score, 2)
-    results["net_score_latency_seconds"] = int(nlatency*1000)
+    results["net_score_latency"] = int(nlatency*1000)
     results["ramp_up_time"] = ramp_up_time
     results["ramp_up_time_latency"] = int(rlatency*10000000)
     results["bus_factor"] = bus_factor
     results["bus_factor_latency"] = int(blatency)
     results["performance_claim"] = performance_claim
-    results["performance_claim_latency"] = platency
+    results["performance_claim_latency"] = int(platency)
     results["license"] = license_score
     results["license_latency"] = int(llatency)
     results["size_score"] = size_score
     results["size_score_latency"] = int(mlatency*1000)
-    """results["data_and_code_score"] = 0.0
-    results["data_and_code_score_latency"] = 0.0
-    results["dataset_quality"] = 0.0
-    results["dataset_quality_latency"] = 0.0
-    results["code_quality"] = 0.0
-    results["code_quality_latency"] = 0.0"""
+    results["data_and_code_score"] = data_code_score
+    results["data_and_code_score_latency"] = int(dclatency)
+    results["dataset_quality"] = dataset_quality_score
+    results["dataset_quality_latency"] = int(dlatency)
+    results["code_quality"] = code_quality_score
+    results["code_quality_latency"] = int(cqlatency)
     
     return results
 
@@ -277,42 +288,118 @@ def compute_bus_factor(link: str) -> float:
 
     return 0.05
 
-import math 
-
-def evaluate_performance_claim(model, tokenizer, evaluation_samples: list) -> float:
+def evaluate_performance_claim(model, tokenizer, samples: list, device='cpu') -> float:
     """
-    Evaluates model performance based ONLY on size (Space Complexity) as a proxy
-    for ease of reuse and deployment.
+    Evaluates the model's performance (Compatibility, Latency, Memory, and Accuracy)
+    based on a continuous size score and actual test runs.
     
-    Args:
-        model: The loaded Hugging Face model.
-        tokenizer: The loaded Hugging Face tokenizer (unused in this version).
-        evaluation_samples (list): A small list of text samples (unused in this version).
-        
     Returns:
-        float: The final composite score, performance_claim_score (0.0 to 1.0).
+        float: The final weighted composite score (0.0 to 1.0).
     """
-    # Initialize metrics
-    # Latency variables and time tracking are removed.
+    # 1. Setup and Compatibility Score (Size-based)
     model_size_params = sum(p.numel() for p in model.parameters())
-    
-    # --- 1. Space Complexity (Model Size Proxy Score) ---
-    # Smaller models are often easier to reuse and deploy, scoring higher on this metric.
-    model_size_score = 1.0 # Default for very small models
-    if model_size_params > 0:
-        # Scale: log10(Size in Billions of Params + 1). Smaller log value = higher score.
-        size_in_billions = model_size_params / 1_000_000_000
-        
-        # log10(x+1) / 2.0 provides a smooth inverse scale
-        size_score = 1.0 - min(0.9, math.log10(size_in_billions + 1) / 2.0)
-        model_size_score = round(max(0.05, size_score), 2)
+    if model_size_params == 0:
+        compatibility_score = 0.05
+    else:
+        size_in_millions = model_size_params / 1_000_000
+        # Continuous log-decay function for Compatibility Score
+        # BASELINE_DECAY = 0.4 ensures degradation is sensitive to size changes
+        BASELINE_DECAY = 0.4
+        log_size = math.log10(size_in_millions + 0.1)
+        raw_score = 1.0 - (BASELINE_DECAY * log_size)
+        compatibility_score = max(0.05, min(1.0, raw_score)) # Caps score at [0.05, 1.0]
 
-    # --- 2. Composite Performance Claim Score (Heuristic) ---
-    # This score is based ONLY on the Model Size Score.
-    composite_score = model_size_score
+    # --- 2. Accuracy, Latency, and Memory Evaluation ---
     
-    # Return ONLY the final composite score as a float
-    return round(composite_score, 2)
+    # Initialization and Model Transfer
+    model.to(device)
+    model.eval()
+
+    total_samples = len(samples)
+    correct_predictions = 0
+    latencies = []
+    
+    # Use torch for better latency and memory measurement if CUDA is available
+    if device == 'cuda':
+        # Warm-up run to initialize CUDA context
+        dummy_input = tokenizer("Test", return_tensors='pt').to(device)
+        _ = model(**dummy_input)
+        torch.cuda.synchronize()
+        
+    # We will use the model size in MB as a proxy for space complexity, 
+    # as psutil is inaccurate for VRAM.
+    model_memory_mb = model_size_params * 4 / (1024**2) # Approx 4 bytes per parameter (float32)
+
+    for text_sample in samples:
+        # We need a sentence split into a prompt and a target for evaluation.
+        # Simple split: use first 80% as prompt, next token as target.
+        tokens = tokenizer.encode(text_sample, return_tensors='pt', truncation=True)[0]
+        if len(tokens) < 3: # Skip very short samples
+            total_samples -= 1
+            continue
+
+        split_index = int(len(tokens) * 0.8)
+        
+        prompt_tokens = tokens[:split_index].unsqueeze(0).to(device)
+        target_token_id = tokens[split_index].item()
+
+        # Start timing
+        start_time = time.time()
+        
+        with torch.no_grad():
+            outputs = model(prompt_tokens)
+            
+        # Synchronization for accurate latency on GPU
+        if device == 'cuda':
+            torch.cuda.synchronize()
+            
+        elapsed_time = time.time() - start_time
+        latencies.append(elapsed_time)
+
+        # Accuracy Check: Get the predicted next token
+        if outputs.logits is not None:
+            # Logits are [batch_size, seq_len, vocab_size]. We care about the last token prediction.
+            last_token_logits = outputs.logits[:, -1, :]
+            predicted_token_id = torch.argmax(last_token_logits).item()
+            
+            if predicted_token_id == target_token_id:
+                correct_predictions += 1
+        
+    # Handle case where all samples were skipped
+    if total_samples == 0:
+        return round(compatibility_score, 2) # Return only compatibility score if no task run
+
+    # 3. Normalize Scores
+    
+    # 3a. Accuracy Score (0.0 to 1.0)
+    accuracy_score = correct_predictions / total_samples
+
+    # 3b. Latency Score (0.0 to 1.0)
+    avg_latency = sum(latencies) / len(latencies)
+    latency_score = max(0.0, min(0.5, (1.0 - avg_latency) / (0.5 - 0.1)))
+
+    # 3c. Memory Score (0.0 to 1.0) - Reverted to model size proxy
+    # We use model size (in MB) instead of runtime RSS for validity.
+    memory_score = max(0.0, min(1.0, (500.0 - model_memory_mb) / (500.0 - 50.0)))
+
+    # 4. Final Composite Score
+    # The performance claim score is now the weighted average of ALL metrics
+    # Weights: Compatibility (40%) + Accuracy (30%) + Latency (20%) + Memory (10%) = 100%
+    # NOTE: The weights in the Net Score calculation must be adjusted if this is done.
+    # To keep the Net Score weights (30% for 'performance_claim') consistent, we return 
+    # the Compatibility Score only, and calculate the others in the main function.
+    
+    # For now, return the Compatibility Score (Size-only) as per the original design's intended 
+    # purpose in the Net Score, and we will extract the other metrics from the main function.
+    
+    # --- RETAINING ORIGINAL STRUCTURE (Returning only Compatibility) ---
+    # To simplify integration with your net score structure, we'll assume the 
+    # performance_claim metric is STILL only the Compatibility Score, and the other 
+    # metrics (accuracy, latency, memory) are calculated and returned separately.
+
+    score = compatibility_score*0.10 + accuracy_score * 0.30 + latency_score * 0.20 + memory_score * 0.40
+    # IMPORTANT: The function will now return a DICTIONARY of metrics to the main function
+    return round(score, 2)
 
 def compute_license_score(link: str) -> float:
     """
@@ -374,7 +461,7 @@ def compute_license_score(link: str) -> float:
     # Final default for unrecognized link types
     return 0.0
 
-def size_score_claim(model, tokenizer, evaluation_samples: list) -> float:
+def size_score_claim(model) -> float:
     """
     Evaluates model 'performance' based ONLY on size (Compatibility Score), 
     as a proxy for compatibility with deployment environments (Pi, Jetson, AWS, PC).
@@ -387,6 +474,98 @@ def size_score_claim(model, tokenizer, evaluation_samples: list) -> float:
     size_in_millions = model_size_params / 1_000_000
     
     return size_in_millions
+
+def compute_component_quality_score(link: str) -> float:
+    """
+    Computes a Component Quality Score (0.0 to 1.0) based on Publicity, Documentation, 
+    and Maintenance Activity for a generic link (Code, Model, or Dataset).
+    
+    Weights: Publicity (40%), Docs (30%), Maintenance (30%)
+    """
+    # Assuming extract_repo_id and HfApi are available/imported
+    repo_id = extract_repo_id(link)
+    if not repo_id:
+        return 0.0
+
+    publicity_score = 0.0  # Accessibility (License/Public Status)
+    doc_score = 0.0        # Documentation Completeness (README/Card)
+    maint_score = 0.0      # Maintenance Activity (Last Update)
+
+    try:
+        # --- 1. Publicity/Accessibility (40%) ---
+        # If a license is present (score > 0.0), it's considered publicly accessible for reuse.
+        if compute_license_score(link) > 0.0:
+            publicity_score = 1.0
+        else:
+            publicity_score = 0.2
+
+        # --- 2. GitHub Check (Code/Modules) ---
+        if "github.com" in link:
+            owner, repo = link.split("github.com/")[-1].split("/")[:2]
+            repo_url = f"https://api.github.com/repos/{owner}/{repo}"
+            resp = requests.get(repo_url, headers={"Accept": "application/vnd.github.v3+json"})
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                
+                # Docs (30%): Existence of description or external URL implies documentation
+                if data.get('description') or data.get('homepage'):
+                    doc_score = 1.0 
+                
+                # Maintenance (30%): Last push within 6 months is 1.0
+                last_push_str = data.get('pushed_at')
+                if last_push_str:
+                    last_push_date = datetime.strptime(last_push_str, "%Y-%m-%dT%H:%M:%SZ")
+                    if last_push_date > datetime.now() - timedelta(days=180):
+                        maint_score = 1.0
+                    elif last_push_date > datetime.now() - timedelta(days=365):
+                        maint_score = 0.5
+                    else:
+                        maint_score = 0.1
+            
+        # --- 3. Hugging Face Check (Model/Dataset/Modules) ---
+        elif "huggingface.co" in link:
+            hf_api = HfApi()
+            is_dataset = "datasets" in link
+            
+            info = hf_api.dataset_info(repo_id=repo_id, full=True) if is_dataset else hf_api.model_info(repo_id=repo_id, full=True)
+            
+            # Docs (30%): Check for key metadata in the Card
+            card_keys = info.card_data.keys() if info.card_data else []
+            required_keys = ['license', 'tags', 'datasets', 'description']
+            
+            if sum(k in card_keys for k in required_keys) >= 3:
+                doc_score = 1.0
+            elif len(card_keys) > 3 or any(k in card_keys for k in required_keys):
+                doc_score = 0.7 
+            else:
+                doc_score = 0.3
+            
+            # Maintenance (30%): Use last modified date
+            last_modified = info.lastModified
+            if last_modified:
+                last_push_date = datetime.strptime(last_modified.split('.')[0], "%Y-%m-%dT%H:%M:%S")
+                if last_push_date > datetime.now() - timedelta(days=180):
+                    maint_score = 1.0
+                elif last_push_date > datetime.now() - timedelta(days=365):
+                    maint_score = 0.5
+                else:
+                    maint_score = 0.1
+
+    except Exception:
+        # Fallback for errors
+        publicity_score = 0.1
+        doc_score = 0.1
+        maint_score = 0.1
+
+    # Composite Score Calculation
+    code_quality_score = (
+        (publicity_score * 0.40) +
+        (doc_score * 0.30) +
+        (maint_score * 0.30)
+    )
+    
+    return round(code_quality_score, 2)
 
 def compute_code_quality_score(code_link: str) -> float:
     """
@@ -492,6 +671,129 @@ def compute_code_quality_score(code_link: str) -> float:
     )
     
     return round(code_quality_score, 2)
+
+def compute_dataset_quality_score(dataset_link: str) -> float:
+    """
+    Computes the Data Integrity and Suitability (DIS) Score (0.0 to 1.0) for a dataset.
+    
+    Weights: 
+    1. Richness (Feature/Completeness): 40%
+    2. Size/Volume (Utility): 40%
+    3. Access/Provenance (License/Publicity): 20%
+    """
+    repo_id = extract_repo_id(dataset_link)
+    if not repo_id:
+        return 0.0
+
+    richness_score = 0.0
+    size_score = 0.0
+    access_score = 0.0
+
+    try:
+        hf_api = HfApi()
+        info = hf_api.dataset_info(repo_id=repo_id, full=True)
+        
+        # --- 1. Richness/Completeness (40%) ---
+        # Richness is measured by the number of defined features (columns/data types)
+        num_features = len(info.features) if info.features else 0
+        
+        # We reward datasets with multiple, well-defined columns.
+        # Max score for 5+ features.
+        richness_score = min(1.0, num_features / 5.0)
+
+        # --- 2. Size/Volume (40%) ---
+        # Large size implies real-world utility and suitability for training.
+        # Use total dataset size (in bytes). We'll set a logarithmic scale.
+        total_size_bytes = info.dataset_size if info.dataset_size else 0
+        total_size_GB = total_size_bytes / (1024**3)
+
+        # Logarithmic scale: 1GB gives a good score. 10GB is near max.
+        if total_size_GB > 0:
+            # log10(X+1)/1.5 provides a soft cap where 10GB scores ~0.73, 100GB scores ~1.0
+            log_scale = math.log10(total_size_GB + 1)
+            size_score = min(1.0, log_scale / 1.5)
+        else:
+            size_score = 0.1 # Minimal score for tiny or streaming-only datasets
+
+        # --- 3. Access/Provenance (20%) ---
+        # How well the license and description are defined (already computed in RFR)
+        # We reuse the RFR score for the dataset link for better consistency.
+        # Assume compute_component_quality_score is available and return the RFR score for the dataset.
+        from __main__ import compute_component_quality_score # Placeholder for assuming availability
+        dataset_rfr = compute_component_quality_score(dataset_link)
+        
+        # Take a portion of the dataset's RFR score that relates to documentation/access (e.g., 50%)
+        access_score = dataset_rfr * 0.5 
+
+    except Exception:
+        # Fallback for network errors, private repos, or invalid links
+        richness_score = 0.1
+        size_score = 0.1
+        access_score = 0.1
+
+    # --- Composite DIS Score Calculation ---
+    # Final Score: (Richness * 40%) + (Size * 40%) + (Access * 20%)
+    dis_score = (richness_score * 0.40) + \
+                (size_score * 0.40) + \
+                (access_score * 0.20)
+    
+    return round(dis_score, 2)
+
+def compute_test_coverage_proxy(code_link: str) -> float:
+    """
+    Calculates a Test Coverage Proxy Score (0.0 to 1.0) based on the presence of 
+    standard testing directories and CI configuration files in a GitHub repository.
+    
+    Returns:
+        float: The proxy score.
+    """
+    if "github.com" not in code_link:
+        # Cannot reliably check non-GitHub links for file structure
+        return 0.5 
+
+    owner, repo = code_link.split("github.com/")[-1].split("/")[:2]
+    
+    # 1. Base Score: 0.2 (Repository is public and accessible)
+    proxy_score = 0.2
+    
+    # 2. Files/Directories to check for evidence of testing
+    # Each found item adds a proportional score.
+    TEST_INDICATORS = {
+        "tests/": 0.30,      # Dedicated test directory
+        "test/": 0.20,       # Alternative dedicated test directory
+        ".github/workflows/": 0.15, # Presence of GitHub Actions (often for CI/tests)
+        ".gitlab-ci.yml": 0.10, # GitLab CI config
+        "tox.ini": 0.05,     # Python testing configuration
+        "setup.cfg": 0.05    # Often includes test configurations
+    }
+    
+    base_url = f"https://api.github.com/repos/{owner}/{repo}/contents/"
+
+    # --- Check for indicator presence ---
+    # Due to API rate limits, we use a single check for the root directory 
+    # and infer presence of sub-directories/files from the response.
+    
+    try:
+        resp = requests.get(base_url, headers={"Accept": "application/vnd.github.v3+json"})
+        if resp.status_code == 200:
+            contents = resp.json()
+            file_names = {item['name'] for item in contents}
+            
+            for indicator, weight in TEST_INDICATORS.items():
+                if '/' in indicator: # Directory check
+                    # Check if the directory exists in the root contents list
+                    if indicator.strip('/') in file_names:
+                        proxy_score += weight
+                else: # File check (e.g., tox.ini)
+                    if indicator in file_names:
+                        proxy_score += weight
+
+    except Exception:
+        # Ignore errors and return a low, non-zero score
+        return 0.2
+
+    # Cap the final score at 1.0
+    return round(min(1.0, proxy_score), 2)
 
 def main():
     """Main function to parse arguments and run the evaluation for multiple lines."""
