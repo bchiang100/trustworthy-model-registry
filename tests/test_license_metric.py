@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from acme_cli.metrics.license import LicenseMetric
 from acme_cli.types import ModelContext, ModelMetadata, RepoFile, ScoreTarget
@@ -11,7 +11,7 @@ def _context_with_license(license_value) -> ModelContext:
         card_data={"license": license_value},
         downloads=None,
         likes=None,
-        last_modified=datetime.now(UTC),
+        last_modified=datetime.now(timezone.utc),
         tags=[],
         files=[RepoFile(path="README.md", size_bytes=10)],
         pipeline_tag=None,

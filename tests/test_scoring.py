@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import acme_cli.scoring as scoring
@@ -20,7 +20,7 @@ class _ModelScorerStub:
             card_data={"license": "mit"},
             downloads=100,
             likes=10,
-            last_modified=datetime.now(UTC),
+            last_modified=datetime.now(timezone.utc),
             tags=["demo"],
             files=[RepoFile(path="model.safetensors", size_bytes=1024)],
             pipeline_tag="text-generation",

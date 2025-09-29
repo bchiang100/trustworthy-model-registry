@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from acme_cli.hf.client import HfClient, HuggingFaceConfig
 
@@ -11,7 +11,7 @@ class _ModelInfo:
         self.cardData = {"license": "mit"}
         self.downloads = 100
         self.likes = 5
-        self.lastModified = datetime.now(UTC)
+        self.lastModified = datetime.now(timezone.utc)
         self.tags = ["demo"]
         self.siblings = []
         self.pipeline_tag = "text-generation"
@@ -22,7 +22,7 @@ class _DatasetInfo:
     def __init__(self) -> None:
         self.id = "acme/dataset"
         self.cardData = {"license": "cc-by-4.0", "citation": "Paper"}
-        self.lastModified = datetime.now(UTC)
+        self.lastModified = datetime.now(timezone.utc)
         self.size = 1024
         self.tags = ["demo"]
         self.license = "cc-by-4.0"

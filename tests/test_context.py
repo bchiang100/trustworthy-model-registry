@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from acme_cli.context import ContextBuilder
@@ -18,7 +18,7 @@ class _StubHfClient:
             card_data={},
             downloads=100,
             likes=10,
-        last_modified=datetime.now(UTC),
+            last_modified=datetime.now(timezone.utc),
             tags=["demo"],
             files=[RepoFile(path="README.md", size_bytes=10)],
             pipeline_tag="text-generation",
@@ -32,7 +32,7 @@ class _StubHfClient:
         return DatasetMetadata(
             repo_id=repo_id,
             card_data={"license": "cc-by-4.0"},
-        last_modified=datetime.now(UTC),
+            last_modified=datetime.now(timezone.utc),
             size_bytes=1024,
             citation="Paper",
             tags=["demo"],

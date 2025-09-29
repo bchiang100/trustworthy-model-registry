@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from acme_cli.llm import LlmUnavailable
@@ -64,7 +64,7 @@ def _context(tmp_path: Path) -> ModelContext:
         card_data={"license": "apache-2.0"},
         downloads=1000,
         likes=50,
-        last_modified=datetime.now(UTC),
+        last_modified=datetime.now(timezone.utc),
         tags=["text-generation", "demo"],
         files=[RepoFile(path="model.safetensors", size_bytes=weight_path.stat().st_size)],
         pipeline_tag="text-generation",
@@ -73,7 +73,7 @@ def _context(tmp_path: Path) -> ModelContext:
     dataset_metadata = DatasetMetadata(
         repo_id="acme/dataset",
         card_data={"license": "cc-by-4.0", "citation": "arXiv"},
-        last_modified=datetime.now(UTC),
+        last_modified=datetime.now(timezone.utc),
         size_bytes=5 * 1024 * 1024,
         citation="Paper",
         tags=["nlp"],
@@ -178,7 +178,7 @@ def test_size_metric_uses_metadata(tmp_path: Path) -> None:
         card_data={},
         downloads=None,
         likes=None,
-        last_modified=datetime.now(UTC),
+        last_modified=datetime.now(timezone.utc),
         tags=[],
         files=[RepoFile(path="pytorch_model.bin", size_bytes=1024 * 1024)],
         pipeline_tag=None,
