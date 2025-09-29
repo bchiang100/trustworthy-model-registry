@@ -1,0 +1,4 @@
+https://huggingface.co/datasets/hf-internal-testing/cats_vs_dogs_dummy
+https://github.com/huggingface/datasets
+https://github.com/huggingface/tokenizers
+https://huggingface.co/hf-internal-testing/tiny-random-gpt2

@@ -1,0 +1,2 @@
+https://huggingface.co/datasets/common_voice
+https://huggingface.co/facebook/wav2vec2-base-960h

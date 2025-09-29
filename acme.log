@@ -1,0 +1,66 @@
+2025-09-28 20:26:22,389 ERROR Failed to score https://huggingface.co/sshleifer/tiny-gpt2
+Traceback (most recent call last):
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/scoring.py", line 40, in _score_target
+    summary = scorer.score(target)
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/scoring_engine.py", line 27, in score
+    context = self._context_builder.build(target)
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/context.py", line 33, in build
+    commit_authors, commit_total = self._hf.list_commit_authors(parsed_model.repo_id, repo_type="model")
+                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/hf/client.py", line 94, in list_commit_authors
+    commit_data = commit if isinstance(commit, dict) else commit.to_dict()  # type: ignore[call-arg]
+                                                          ^^^^^^^^^^^^^^
+AttributeError: 'GitCommitInfo' object has no attribute 'to_dict'
+2025-09-28 20:26:22,391 INFO Scored model https://huggingface.co/sshleifer/tiny-gpt2
+2025-09-28 20:26:54,111 INFO Scored model https://huggingface.co/sshleifer/tiny-gpt2
+2025-09-28 20:42:09,107 INFO Scored model https://huggingface.co/datasets/ag_news
+2025-09-28 20:42:16,434 INFO Scored model https://huggingface.co/datasets/squad
+2025-09-28 20:42:16,519 ERROR Failed to score https://huggingface.co/deepset/roberta-base-squad2
+Traceback (most recent call last):
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/scoring.py", line 40, in _score_target
+    summary = scorer.score(target)
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/scoring_engine.py", line 27, in score
+    context = self._context_builder.build(target)
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/context.py", line 32, in build
+    model_metadata = self._hf.get_model(parsed_model.repo_id)
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/hf/client.py", line 78, in get_model
+    return self._convert_model_info(info)
+           ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/hf/client.py", line 48, in _convert_model_info
+    card_data=dict(info.cardData or {}),
+              ~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/.venv/lib/python3.13/site-packages/huggingface_hub/repocard_data.py", line 233, in __getitem__
+    return self.__dict__[key]
+           ~~~~~~~~~~~~~^^^^^
+KeyError: 0
+2025-09-28 20:42:16,522 INFO Scored model https://huggingface.co/deepset/roberta-base-squad2
+2025-09-28 20:42:22,572 INFO Scored model https://huggingface.co/datasets/cifar10
+2025-09-28 20:42:22,627 ERROR Failed to score https://huggingface.co/microsoft/resnet-50
+Traceback (most recent call last):
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/scoring.py", line 40, in _score_target
+    summary = scorer.score(target)
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/scoring_engine.py", line 27, in score
+    context = self._context_builder.build(target)
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/context.py", line 32, in build
+    model_metadata = self._hf.get_model(parsed_model.repo_id)
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/hf/client.py", line 78, in get_model
+    return self._convert_model_info(info)
+           ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/src/acme_cli/hf/client.py", line 48, in _convert_model_info
+    card_data=dict(info.cardData or {}),
+              ~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/.venv/lib/python3.13/site-packages/huggingface_hub/repocard_data.py", line 233, in __getitem__
+    return self.__dict__[key]
+           ~~~~~~~~~~~~~^^^^^
+KeyError: 0
+2025-09-28 20:42:22,629 INFO Scored model https://huggingface.co/microsoft/resnet-50
+2025-09-28 20:58:43,487 INFO Scored model https://huggingface.co/datasets/ag_news
+2025-09-28 20:59:24,435 INFO Scored model https://huggingface.co/datasets/ag_news
+2025-09-28 21:09:07,075 INFO Scored model https://huggingface.co/distilbert-base-uncased
+2025-09-28 21:35:44,235 INFO Scored model https://huggingface.co/distilbert-base-uncased
+2025-09-28 21:35:53,672 INFO Scored model https://huggingface.co/sshleifer/tiny-gpt2
+2025-09-28 21:36:04,669 WARNING No model URLs found in input file /Users/ruoyu/Library/CloudStorage/OneDrive-purdue.edu/Fall 2025-_Final One/ECE 46100_Soft_Eng/Project/ECE30861/examples/urls_edge03_dataset_without_model.txt
+2025-09-28 21:36:12,834 INFO Scored model https://huggingface.co/distilbert-base-uncased
+2025-09-28 21:36:13,313 INFO Scored model https://huggingface.co/distilbert-base-uncased
+2025-09-28 21:36:38,175 INFO Scored model https://huggingface.co/distilbert-base-uncased
+2025-09-28 21:36:55,645 INFO Scored model https://huggingface.co/sshleifer/tiny-gpt2

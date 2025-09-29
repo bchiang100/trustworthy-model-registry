@@ -1,0 +1,6 @@
+https://huggingface.co/datasets/ag_news
+https://github.com/huggingface/peft
+https://huggingface.co/sshleifer/tiny-gpt2
+https://huggingface.co/datasets/wikitext/wikitext-2-raw-v1
+https://github.com/huggingface/diffusers
+https://huggingface.co/hf-internal-testing/tiny-random-roberta

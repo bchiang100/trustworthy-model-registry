@@ -1,0 +1,1 @@
+ftp://huggingface.co/sshleifer/tiny-gpt2

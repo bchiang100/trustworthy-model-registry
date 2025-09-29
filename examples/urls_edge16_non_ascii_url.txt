@@ -1,0 +1,2 @@
+https://huggingface.co/datasets/hf-internal-testing/🦙-test
+https://huggingface.co/hf-internal-testing/tiny-random-gpt2

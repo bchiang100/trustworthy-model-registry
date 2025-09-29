@@ -1,0 +1,5 @@
+not-a-url
+https://huggingface.co/datasets/ag_news
+ftp://huggingface.co/invalid
+https://github.com/huggingface/transformers
+https://huggingface.co/sshleifer/tiny-gpt2

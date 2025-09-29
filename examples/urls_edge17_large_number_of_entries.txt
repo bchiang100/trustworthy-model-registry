@@ -1,0 +1,6 @@
+https://huggingface.co/datasets/ag_news
+https://github.com/huggingface/datasets
+https://huggingface.co/sshleifer/tiny-gpt2
+https://huggingface.co/datasets/squad
+https://github.com/deepset-ai/haystack
+https://huggingface.co/deepset/roberta-base-squad2

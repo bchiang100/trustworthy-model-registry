@@ -1,0 +1,3 @@
+https://huggingface.co/datasets/hf-internal-testing/corporate-buzzwords
+https://github.com/huggingface/transformers
+https://huggingface.co/hf-internal-testing/tiny-random-gpt2
