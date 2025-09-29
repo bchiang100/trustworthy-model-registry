@@ -20,6 +20,7 @@ try:
     from huggingface_hub import HfApi
     import requests
     from transformers import logging
+    import typer
     logging.set_verbosity_error()   # hides all warnings
     HF_HUB_DISABLE_SYMLINKS_WARNING: True
 except ImportError as e:
@@ -44,6 +45,15 @@ except ImportError as e:
             print(f"Error installing packages: {e}")
             sys.exit(1)
     sys.exit(1)
+
+logging.basicConfig(
+    filename='model_process.log', 
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Create a logger instance for your application
+logger = logging.getLogger(__name__)
 
 def extract_repo_id(url: str) -> str:
     """Extracts the Hugging Face repo ID or GitHub/GitLab information."""
@@ -75,7 +85,9 @@ def evaluate_model_dataset_code(model_link: str, dataset_link: str, code_link: s
             model = AutoModelForMaskedLM.from_pretrained(model_id)
             tokenizer = AutoTokenizer.from_pretrained(model_id)
         except Exception as e_fallback:
-            return {"Error": f"Failed to load model {model_id}. Error: {e_fallback}"}
+            typer.echo("Error", f"Failed to load model {model_id}. Error: {e_fallback}") 
+        
+    logger.info(f"Model {model_id} loaded successfully.")
         
     ramp_up_time = round((time.time() - start_time), 2)
     start_time = time.time()
@@ -103,11 +115,11 @@ def evaluate_model_dataset_code(model_link: str, dataset_link: str, code_link: s
         
         except Exception as e_fallback:
             # If the reliable fallback fails, something is fundamentally wrong with the environment/libraries.
-            return {"Error": f"Failed to load both primary ({dataset_name}) and fallback ({fallback_dataset_id}). Error: {e_fallback}"}
+           typer.echo("Error", f"Failed to load both primary ({dataset_name}) and fallback ({fallback_dataset_id}). Error: {e_fallback}")
 
     # CRITICAL: Check if data was successfully loaded before proceeding
     if data is None:
-        return {"Error": "Dataset loading failed and returned a None object."}
+        typer.echo("Error Dataset loading failed and returned a None object.")
 
     # --- 3. Prepare Text Samples (This section remains largely the same) ---
     if 'text' in data.column_names:
