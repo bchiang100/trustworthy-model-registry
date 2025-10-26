@@ -32,15 +32,15 @@ jobs:
     # Add your AWS deployment steps here when ready
     - name: Deploy to staging (placeholder)
       run: |
-        echo "🚀 Deploying to staging environment..."
+        echo "Deploying to staging environment..."
         echo "Package built successfully: $(ls dist/)"
         echo "Ready for AWS Lambda deployment"
 
     # Notify team of successful deployment
     - name: Deployment notification
       run: |
-        echo "✅ Staging deployment completed successfully"
-        echo "🔗 Application available at: [staging-url-here]"
+        echo "Staging deployment completed successfully"
+        echo "Application available at: [staging-url-here]"
 
   deploy-production:
     runs-on: ubuntu-latest
@@ -71,11 +71,11 @@ jobs:
     # Add your production AWS deployment steps here
     - name: Deploy to production (placeholder)
       run: |
-        echo "🚀 Deploying to production environment..."
+        echo "Deploying to production environment..."
         echo "Package built successfully: $(ls dist/)"
         echo "Ready for production AWS Lambda deployment"
 
     - name: Production deployment notification
       run: |
-        echo "✅ Production deployment completed successfully"
-        echo "🔗 Application available at: [production-url-here]"
+        echo "Production deployment completed successfully"
+        echo "Application available at: [production-url-here]"
