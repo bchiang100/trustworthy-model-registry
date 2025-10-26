@@ -18,7 +18,7 @@ Requires-Dist: respx>=0.21; extra == "dev"
 
 # ACME Trustworthy Model CLI
 
-This repository implements the Phase 1 deliverable for ACME Corporation’s internal model registry CLI. The tool evaluates pre-trained Hugging Face models against Sarah’s requirements and prints NDJSON scorecards ready for ingestion by downstream systems.
+This repository implements the ECE 46100 Project Phase 1 deliverable for ACME Corporation’s internal model registry CLI. The tool evaluates pre-trained Hugging Face models against Sarah’s requirements and prints NDJSON scorecards ready for ingestion by downstream systems.
 
 ## Getting Started
 
@@ -83,7 +83,7 @@ Latencies are rounded to milliseconds as required.
 
 ## Testing & Quality
 
-- `pytest` with coverage (`./run test`) achieves ~91% line coverage across the CLI.
+- `pytest` with coverage (`./run test`) achieves ~90% line coverage across the CLI.
 - Tests mock external services and the LLM to avoid network dependencies.
 - Critical components (URL parsing, context building, metrics, registry, runner, scoring pipeline) are unit tested.
 
