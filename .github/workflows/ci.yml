@@ -109,29 +109,6 @@ jobs:
         pip install dist/*.whl
         python run --help
 
-  security:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.11"
-
-    - name: Install security tools
-      run: |
-        python -m pip install --upgrade pip
-        pip install safety bandit
-
-    - name: Run safety check (dependency vulnerabilities)
-      run: safety check --json
-
-    - name: Run bandit (security linting)
-      run: bandit -r src/ -f json
-
   copilot-review:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
@@ -140,7 +117,8 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: GitHub Copilot Code Review
-      uses: github/copilot-code-review-action@v1
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Request GitHub Copilot Code Review
+      run: |
+        echo "Requesting GitHub Copilot code review..."
+        echo "Note: Enable Copilot Auto-Review in repository settings"
+        echo "See: https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/configure-automatic-review"

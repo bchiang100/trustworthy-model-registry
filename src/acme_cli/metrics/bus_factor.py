@@ -1,4 +1,5 @@
 """Bus factor metric based on commit authorship data."""
+
 from __future__ import annotations
 
 from acme_cli.metrics.base import Metric

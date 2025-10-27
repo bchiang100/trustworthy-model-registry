@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from acme_cli.metrics.base import Metric
 from acme_cli.scoring_engine import ModelScorer, ScoreSummary
-from acme_cli.types import EvaluationOutcome, LocalRepository, MetricResult, ModelContext, ModelMetadata, RepoFile, ScoreTarget
+from acme_cli.types import (EvaluationOutcome, LocalRepository, MetricResult,
+                            ModelContext, ModelMetadata, RepoFile, ScoreTarget)
 
 
 class _StubBuilder:

@@ -1,4 +1,5 @@
 """Dataset quality metric implementation."""
+
 from __future__ import annotations
 
 import math
@@ -42,7 +43,11 @@ class DatasetQualityMetric(Metric):
             governance_component += min(0.2, len(metadata.tags) * 0.02)
 
         governance_component = clamp(governance_component)
-        score = 0.4 * size_component + 0.3 * documentation_component + 0.3 * governance_component
+        score = (
+            0.4 * size_component
+            + 0.3 * documentation_component
+            + 0.3 * governance_component
+        )
         return clamp(score)
 
     @staticmethod

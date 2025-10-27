@@ -1,4 +1,5 @@
 """Metric interfaces and shared helpers."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -20,5 +21,3 @@ class Metric(ABC):
         with timed_operation() as elapsed:
             value = self.compute(context)
         return MetricResult(name=self.name, value=value, latency_ms=elapsed())
-
-

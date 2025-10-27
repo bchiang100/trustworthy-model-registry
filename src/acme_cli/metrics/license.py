@@ -1,4 +1,5 @@
 """License permissiveness metric."""
+
 from __future__ import annotations
 
 from acme_cli.metrics.base import Metric

@@ -1,4 +1,5 @@
 """Build rich contexts for metric evaluation."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,14 +7,19 @@ from typing import Iterable
 
 from acme_cli.hf.client import HfClient
 from acme_cli.hf.local_cache import RepositoryCache
-from acme_cli.types import DatasetMetadata, LocalRepository, ModelContext, ModelMetadata, ScoreTarget
+from acme_cli.types import (DatasetMetadata, LocalRepository, ModelContext,
+                            ModelMetadata, ScoreTarget)
 from acme_cli.urls import parse_artifact_url
 
 
 class ContextBuilder:
     """Constructs :class:`ModelContext` instances used by metrics."""
 
-    def __init__(self, hf_client: HfClient | None = None, repo_cache: RepositoryCache | None = None) -> None:
+    def __init__(
+        self,
+        hf_client: HfClient | None = None,
+        repo_cache: RepositoryCache | None = None,
+    ) -> None:
         self._hf = hf_client or HfClient()
         self._cache = repo_cache or RepositoryCache()
 
@@ -30,12 +36,25 @@ class ContextBuilder:
 
         if parsed_model.repo_id:
             model_metadata = self._hf.get_model(parsed_model.repo_id)
-            commit_authors, commit_total = self._hf.list_commit_authors(parsed_model.repo_id, repo_type="model")
+            commit_authors, commit_total = self._hf.list_commit_authors(
+                parsed_model.repo_id, repo_type="model"
+            )
             if model_metadata:
                 local_repo = self._cache.ensure_local(
                     parsed_model.repo_id,
                     repo_type="model",
-                    allow_patterns=["README.*", "*.md", "*.json", "*.py", "*.txt", "*.yaml", "*.yml", "*.cfg", "*.ini", "*.pyi"],
+                    allow_patterns=[
+                        "README.*",
+                        "*.md",
+                        "*.json",
+                        "*.py",
+                        "*.txt",
+                        "*.yaml",
+                        "*.yml",
+                        "*.cfg",
+                        "*.ini",
+                        "*.pyi",
+                    ],
                 )
                 readme_text = _load_readme(local_repo.path)
 
@@ -69,7 +88,11 @@ class ContextBuilder:
 def _first_hf_dataset_id(urls: Iterable[str]) -> str | None:
     for url in urls:
         parsed = parse_artifact_url(url)
-        if parsed.platform == "huggingface" and parsed.kind == "dataset" and parsed.repo_id:
+        if (
+            parsed.platform == "huggingface"
+            and parsed.kind == "dataset"
+            and parsed.repo_id
+        ):
             return parsed.repo_id
     return None
 
