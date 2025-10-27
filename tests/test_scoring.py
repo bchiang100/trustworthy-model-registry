@@ -6,7 +6,8 @@ from pathlib import Path
 
 import acme_cli.scoring as scoring
 from acme_cli.scoring_engine import ScoreSummary
-from acme_cli.types import EvaluationOutcome, LocalRepository, MetricResult, ModelContext, ModelMetadata, RepoFile, ScoreTarget
+from acme_cli.types import (EvaluationOutcome, LocalRepository, MetricResult,
+                            ModelContext, ModelMetadata, RepoFile, ScoreTarget)
 
 
 class _ModelScorerStub:
@@ -30,7 +31,9 @@ class _ModelScorerStub:
             target=target,
             model_metadata=metadata,
             dataset_metadata=None,
-            local_repo=LocalRepository(repo_id="acme/model", repo_type="model", path=None),
+            local_repo=LocalRepository(
+                repo_id="acme/model", repo_type="model", path=None
+            ),
             dataset_local_repo=None,
             readme_text="README",
             dataset_readme_text=None,
@@ -42,7 +45,16 @@ class _ModelScorerStub:
             "bus_factor": MetricResult("bus_factor", 0.6, 9),
             "performance_claims": MetricResult("performance_claims", 0.7, 8),
             "license": MetricResult("license", 1.0, 3),
-            "size_score": MetricResult("size_score", {"raspberry_pi": 0.9, "jetson_nano": 0.8, "desktop_pc": 0.7, "aws_server": 0.6}, 5),
+            "size_score": MetricResult(
+                "size_score",
+                {
+                    "raspberry_pi": 0.9,
+                    "jetson_nano": 0.8,
+                    "desktop_pc": 0.7,
+                    "aws_server": 0.6,
+                },
+                5,
+            ),
             "dataset_and_code_score": MetricResult("dataset_and_code_score", 0.5, 4),
             "dataset_quality": MetricResult("dataset_quality", 0.4, 4),
             "code_quality": MetricResult("code_quality", 0.9, 6),

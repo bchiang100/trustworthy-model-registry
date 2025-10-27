@@ -1,4 +1,5 @@
-from acme_cli.urls import is_code_url, is_dataset_url, is_model_url, parse_artifact_url
+from acme_cli.urls import (is_code_url, is_dataset_url, is_model_url,
+                           parse_artifact_url)
 
 
 def test_parse_huggingface_model_url() -> None:
