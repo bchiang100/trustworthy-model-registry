@@ -4,8 +4,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from acme_cli.context import ContextBuilder
-from acme_cli.types import (DatasetMetadata, LocalRepository, ModelMetadata,
-                            RepoFile, ScoreTarget)
+from acme_cli.types import (
+    DatasetMetadata,
+    LocalRepository,
+    ModelMetadata,
+    RepoFile,
+    ScoreTarget,
+)
 
 
 class _StubHfClient:
