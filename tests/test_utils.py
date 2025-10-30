@@ -1,5 +1,4 @@
-from acme_cli.utils import (clamp, contains_keywords, timed_operation,
-                            word_count)
+from acme_cli.utils import clamp, contains_keywords, timed_operation, word_count
 
 
 def test_clamp_bounds() -> None:
