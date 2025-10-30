@@ -7,13 +7,8 @@ from typing import Iterable
 
 from acme_cli.hf.client import HfClient
 from acme_cli.hf.local_cache import RepositoryCache
-from acme_cli.types import (
-    DatasetMetadata,
-    LocalRepository,
-    ModelContext,
-    ModelMetadata,
-    ScoreTarget,
-)
+from acme_cli.types import (DatasetMetadata, LocalRepository, ModelContext,
+                            ModelMetadata, ScoreTarget)
 from acme_cli.urls import parse_artifact_url
 
 

@@ -5,7 +5,8 @@ from __future__ import annotations
 from acme_cli.llm import LlmEvaluator, LlmUnavailable
 from acme_cli.metrics.base import Metric
 from acme_cli.types import ModelContext
-from acme_cli.utils import clamp, contains_keywords, count_code_fences, word_count
+from acme_cli.utils import (clamp, contains_keywords, count_code_fences,
+                            word_count)
 
 
 class RampUpMetric(Metric):

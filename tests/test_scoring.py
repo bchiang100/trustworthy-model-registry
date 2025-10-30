@@ -6,15 +6,8 @@ from pathlib import Path
 
 import acme_cli.scoring as scoring
 from acme_cli.scoring_engine import ScoreSummary
-from acme_cli.types import (
-    EvaluationOutcome,
-    LocalRepository,
-    MetricResult,
-    ModelContext,
-    ModelMetadata,
-    RepoFile,
-    ScoreTarget,
-)
+from acme_cli.types import (EvaluationOutcome, LocalRepository, MetricResult,
+                            ModelContext, ModelMetadata, RepoFile, ScoreTarget)
 
 
 class _ModelScorerStub:
