@@ -29,7 +29,7 @@ jobs:
         python -m pip install build
         python -m build
 
-    # Add your AWS deployment steps here when ready
+    # Add AWS deployment steps here when ready
     - name: Deploy to staging (placeholder)
       run: |
         echo "Deploying to staging environment..."
@@ -68,7 +68,7 @@ jobs:
         python -m pip install build
         python -m build
 
-    # Add your production AWS deployment steps here
+    # Add production AWS deployment steps here
     - name: Deploy to production (placeholder)
       run: |
         echo "Deploying to production environment..."
