@@ -8,7 +8,8 @@ from typing import Iterable
 from acme_cli.context import ContextBuilder
 from acme_cli.metrics.base import Metric
 from acme_cli.metrics.registry import build_metrics, evaluate_metrics
-from acme_cli.types import EvaluationOutcome, MetricResult, ModelContext, ScoreTarget
+from acme_cli.types import (EvaluationOutcome, MetricResult, ModelContext,
+                            ScoreTarget)
 
 
 @dataclass(slots=True)

@@ -16,7 +16,8 @@ from acme_cli.metrics.license import LicenseMetric
 from acme_cli.metrics.performance import PerformanceClaimsMetric
 from acme_cli.metrics.ramp_up import RampUpMetric
 from acme_cli.metrics.size import SizeMetric
-from acme_cli.types import EvaluationOutcome, MetricFailure, MetricResult, ModelContext
+from acme_cli.types import (EvaluationOutcome, MetricFailure, MetricResult,
+                            ModelContext)
 
 
 def build_metrics(llm: LlmEvaluator | None = None) -> list[Metric]:
