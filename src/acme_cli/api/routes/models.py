@@ -75,10 +75,10 @@ MOCK_MODELS = [
             dataset_and_code_score=0.7,
             dataset_quality=0.8,
             code_quality=0.7,
-            # Phase 2 new metrics
-            reproducibility=0.5,    # runs with some debugging needed
-            reviewedness=-1,        # no linked GitHub repository
-            treescore=0.73          # average of parent model scores
+            # new phase 2 metrics
+            reproducibility=0.5,
+            reviewedness=-1,
+            treescore=0.73
         ),
         upload_timestamp="2025-01-02T08:30:00Z",
         file_size=128000000,
@@ -115,10 +115,9 @@ async def upload_model(
             dataset_and_code_score=0.7,
             dataset_quality=0.8,
             code_quality=0.7,
-            # Phase 2 new metrics
-            reproducibility=0.8,    # mostly works with minor tweaks
-            reviewedness=0.75,      # 75% of code was PR reviewed
-            treescore=0.78          # average of parent model scores
+            reproducibility=0.8,
+            reviewedness=0.75,
+            treescore=0.78
         ),
         upload_timestamp="2025-01-03T10:00:00Z",
         file_size=file.size or 100000000,
@@ -195,7 +194,7 @@ async def ingest_huggingface_model(
     if "huggingface.co" not in huggingface_url:
         raise HTTPException(status_code=400, detail="Invalid HuggingFace URL")
 
-    # Extract model name from URL (simplified)
+    # Extracts model name from URL
     model_name = huggingface_url.split("/")[-1] if "/" in huggingface_url else "unknown-model"
 
     return {
