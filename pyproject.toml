@@ -11,6 +11,9 @@ dependencies = [
     "pydantic>=2.8",
     "tqdm>=4.66",
     "cachetools>=5.3",
+    "fastapi>=0.104",
+    "uvicorn[standard]>=0.24",
+    "python-multipart>=0.0.6",
 ]
 
 [project.optional-dependencies]
