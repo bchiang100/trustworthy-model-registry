@@ -21,9 +21,13 @@ class ModelMetadata(BaseModel):
     dataset_quality: float
     code_quality: float
     # Phase 2 new metrics
-    reproducibility: float  # 0 (no code/doesn't run), 0.5 (runs with debugging), 1 (runs perfectly)
-    reviewedness: float     # fraction 0-1 of code introduced via PR with review, -1 if no repo
-    treescore: float        # average of parent model scores according to lineage graph
+    reproducibility: (
+        float  # 0 (no code/doesn't run), 0.5 (runs with debugging), 1 (runs perfectly)
+    )
+    reviewedness: (
+        float  # fraction 0-1 of code introduced via PR with review, -1 if no repo
+    )
+    treescore: float  # average of parent model scores according to lineage graph
 
 
 class ModelResponse(BaseModel):
@@ -52,13 +56,13 @@ MOCK_MODELS = [
             dataset_quality=0.9,
             code_quality=0.8,
             # Phase 2 new metrics
-            reproducibility=1.0,    # runs perfectly with demo code
-            reviewedness=0.85,      # 85% of code was PR reviewed
-            treescore=0.82          # average of parent model scores
+            reproducibility=1.0,  # runs perfectly with demo code
+            reviewedness=0.85,  # 85% of code was PR reviewed
+            treescore=0.82,  # average of parent model scores
         ),
         upload_timestamp="2025-01-01T12:00:00Z",
         file_size=512000000,
-        status="available"
+        status="available",
     ),
     ModelResponse(
         id="model-002",
@@ -78,13 +82,14 @@ MOCK_MODELS = [
             # new phase 2 metrics
             reproducibility=0.5,
             reviewedness=-1,
-            treescore=0.73
+            treescore=0.73,
         ),
         upload_timestamp="2025-01-02T08:30:00Z",
         file_size=128000000,
-        status="available"
-    )
+        status="available",
+    ),
 ]
+
 
 # UPLOAD - accepts zip files and creates models
 @router.post("/models/upload")
@@ -92,10 +97,10 @@ async def upload_model(
     file: UploadFile = File(...),
     name: str = Query(..., description="Model name"),
     version: str = Query(..., description="Model version"),
-    description: Optional[str] = Query(None, description="Model description")
+    description: Optional[str] = Query(None, description="Model description"),
 ):
     """Upload a new model to the registry."""
-    if not file.filename or not file.filename.endswith('.zip'):
+    if not file.filename or not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="File must be a zip archive")
 
     # Mock response - in real implementation, would save file and compute scores
@@ -117,11 +122,11 @@ async def upload_model(
             code_quality=0.7,
             reproducibility=0.8,
             reviewedness=0.75,
-            treescore=0.78
+            treescore=0.78,
         ),
         upload_timestamp="2025-01-03T10:00:00Z",
         file_size=file.size or 100000000,
-        status="processing"
+        status="processing",
     )
 
     MOCK_MODELS.append(mock_model)
@@ -130,25 +135,33 @@ async def upload_model(
         "message": "Model uploaded successfully",
         "model_id": mock_id,
         "status": "processing",
-        "estimated_processing_time": "5 minutes"
+        "estimated_processing_time": "5 minutes",
     }
 
 
 # LIST - Returns the array of all models
 @router.get("/models", response_model=List[ModelResponse])
 async def list_models(
-    search: Optional[str] = Query(None, description="Search in model names and descriptions"),
+    search: Optional[str] = Query(
+        None, description="Search in model names and descriptions"
+    ),
     tag: Optional[str] = Query(None, description="Filter by tag"),
-    limit: int = Query(50, ge=1, le=1000, description="Maximum number of models to return")
+    limit: int = Query(
+        50, ge=1, le=1000, description="Maximum number of models to return"
+    ),
 ):
     """List all models in the registry with optional search and filtering."""
     models = MOCK_MODELS.copy()
 
     if search:
         models = [
-            m for m in models
+            m
+            for m in models
             if search.lower() in m.metadata.name.lower()
-            or (m.metadata.description and search.lower() in m.metadata.description.lower())
+            or (
+                m.metadata.description
+                and search.lower() in m.metadata.description.lower()
+            )
         ]
 
     if tag:
@@ -179,10 +192,11 @@ async def download_model(model_id: str):
                 "model_id": model_id,
                 "download_url": f"/downloads/{model_id}.zip",
                 "file_size": model.file_size,
-                "expires_in": "1 hour"
+                "expires_in": "1 hour",
             }
 
     raise HTTPException(status_code=404, detail="Model not found")
+
 
 # Ingest - imports from the HuggingFace URL
 @router.post("/models/ingest")
@@ -195,12 +209,14 @@ async def ingest_huggingface_model(
         raise HTTPException(status_code=400, detail="Invalid HuggingFace URL")
 
     # Extracts model name from URL
-    model_name = huggingface_url.split("/")[-1] if "/" in huggingface_url else "unknown-model"
+    model_name = (
+        huggingface_url.split("/")[-1] if "/" in huggingface_url else "unknown-model"
+    )
 
     return {
         "message": "Model ingestion started",
         "huggingface_url": huggingface_url,
         "estimated_model_name": model_name,
         "status": "validating",
-        "estimated_completion_time": "10 minutes"
+        "estimated_completion_time": "10 minutes",
     }
