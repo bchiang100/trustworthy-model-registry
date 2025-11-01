@@ -15,8 +15,5 @@ async def health_check():
         "service": "acme-registry",
         "version": "0.1.0",
         "uptime": "operational",
-        "dependencies": {
-            "database": "connected",
-            "storage": "available"
-        }
+        "dependencies": {"database": "connected", "storage": "available"},
     }

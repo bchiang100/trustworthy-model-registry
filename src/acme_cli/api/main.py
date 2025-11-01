@@ -4,7 +4,7 @@
 # Get a specific model: curl http://localhost:8000/api/v1/models/model-001
 # Test Download: curl http://localhost:8000/api/v1/models/model-001/download
 # Test Upload: echo "fake content" > /tmp/test.zip
-  ## curl -X POST "http://localhost:8000/api/v1/models/upload?name=verify-test&version=1.0.0" -F "file=@/tmp/test.zip"
+## curl -X POST "http://localhost:8000/api/v1/models/upload?name=verify-test&version=1.0.0" -F "file=@/tmp/test.zip"
 # Test HuggingFace ingest: curl -X POST "http://localhost:8000/api/v1/models/ingest?huggingface_url=https://huggingface.co/gpt2"
 
 from fastapi import FastAPI
@@ -26,8 +26,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(health.router, prefix="/api/v1", tags=["health"]) # adds health endpoints
-app.include_router(models.router, prefix="/api/v1", tags=["models"]) # adds model endpoints
+app.include_router(
+    health.router, prefix="/api/v1", tags=["health"]
+)  # adds health endpoints
+app.include_router(
+    models.router, prefix="/api/v1", tags=["models"]
+)  # adds model endpoints
 
 
 @app.get("/")
@@ -36,5 +40,5 @@ async def root():
     return {
         "message": "ACME Trustworthy Model Registry API",
         "version": "0.1.0",
-        "status": "operational"
+        "status": "operational",
     }
