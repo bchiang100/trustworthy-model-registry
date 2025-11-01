@@ -10,7 +10,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routes import models, health
+from .routes import health, models
 
 app = FastAPI(
     title="ACME Trustworthy Model Registry",

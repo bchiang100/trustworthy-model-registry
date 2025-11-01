@@ -1,6 +1,7 @@
 """Server startup script for the ACME Registry API."""
 
 import uvicorn
+
 from .main import app
 
 

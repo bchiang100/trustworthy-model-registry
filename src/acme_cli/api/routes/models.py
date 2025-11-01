@@ -1,7 +1,8 @@
 # manages model endpoints for CR[U]D operations
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query
+
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
 router = APIRouter()
