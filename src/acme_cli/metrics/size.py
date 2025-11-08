@@ -1,11 +1,11 @@
 """Model size compatibility metric."""
+
 from __future__ import annotations
 
 from pathlib import Path
 
 from acme_cli.metrics.base import Metric
 from acme_cli.types import ModelContext, RepoFile
-
 
 _THRESHOLDS = {
     "raspberry_pi": (200 * 1024 * 1024, 600 * 1024 * 1024),
@@ -29,7 +29,10 @@ class SizeMetric(Metric):
             total_bytes = self._collect_metadata_bytes(context.model_metadata.files)
         if total_bytes == 0:
             return {key: 0.0 for key in _THRESHOLDS}
-        return {hardware: self._hardware_score(total_bytes, limits) for hardware, limits in _THRESHOLDS.items()}
+        return {
+            hardware: self._hardware_score(total_bytes, limits)
+            for hardware, limits in _THRESHOLDS.items()
+        }
 
     @staticmethod
     def _collect_weight_bytes(path: Path) -> int:

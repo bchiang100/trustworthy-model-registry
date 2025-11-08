@@ -1,4 +1,5 @@
 """Thin wrapper around the Hugging Face Hub API with caching helpers."""
+
 from __future__ import annotations
 
 import os
@@ -9,7 +10,8 @@ from typing import Iterable, Optional
 from huggingface_hub import HfApi
 from huggingface_hub.hf_api import DatasetInfo, ModelInfo, RepoFile
 
-from acme_cli.types import DatasetMetadata, ModelMetadata, RepoFile as RepoFileMetadata
+from acme_cli.types import DatasetMetadata, ModelMetadata
+from acme_cli.types import RepoFile as RepoFileMetadata
 
 
 @dataclass(slots=True)
@@ -28,7 +30,11 @@ class HfClient:
             token=os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv("HF_API_TOKEN"),
             endpoint=os.getenv("HUGGINGFACEHUB_ENDPOINT"),
         )
-        self._api = HfApi(token=config.token, endpoint=config.endpoint) if config.endpoint else HfApi(token=config.token)
+        self._api = (
+            HfApi(token=config.token, endpoint=config.endpoint)
+            if config.endpoint
+            else HfApi(token=config.token)
+        )
 
     # ------------------------------------------------------------------
     # Conversion helpers
@@ -98,9 +104,13 @@ class HfClient:
             return None
         return self._convert_dataset_info(info)
 
-    def list_commit_authors(self, repo_id: str, repo_type: str = "model", limit: int = 50) -> tuple[list[str], int]:
+    def list_commit_authors(
+        self, repo_id: str, repo_type: str = "model", limit: int = 50
+    ) -> tuple[list[str], int]:
         try:
-            commits = self._api.list_repo_commits(repo_id, repo_type=repo_type, formatted=True)
+            commits = self._api.list_repo_commits(
+                repo_id, repo_type=repo_type, formatted=True
+            )
         except Exception:  # noqa: BLE001
             return ([], 0)
         authors: list[str] = []
@@ -114,7 +124,9 @@ class HfClient:
             commit_authors = getattr(commit, "authors", None)
             if commit_authors:
                 for author in commit_authors:
-                    name = getattr(author, "name", None) or getattr(author, "email", None)
+                    name = getattr(author, "name", None) or getattr(
+                        author, "email", None
+                    )
                     if name:
                         authors.append(str(name))
                         break
@@ -126,5 +138,6 @@ class HfClient:
         except Exception:  # noqa: BLE001
             return []
         return list(files)
+
 
 __all__ = ["HfClient", "HuggingFaceConfig"]
