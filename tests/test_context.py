@@ -4,7 +4,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from acme_cli.context import ContextBuilder
-from acme_cli.types import DatasetMetadata, LocalRepository, ModelMetadata, RepoFile, ScoreTarget
+from acme_cli.types import (
+    DatasetMetadata,
+    LocalRepository,
+    ModelMetadata,
+    RepoFile,
+    ScoreTarget,
+)
 
 
 class _StubHfClient:
@@ -25,7 +31,9 @@ class _StubHfClient:
             library_name="transformers",
         )
 
-    def list_commit_authors(self, repo_id: str, repo_type: str = "model", limit: int = 50) -> tuple[list[str], int]:
+    def list_commit_authors(
+        self, repo_id: str, repo_type: str = "model", limit: int = 50
+    ) -> tuple[list[str], int]:
         return (["Alice", "Bob"], 4)
 
     def get_dataset(self, repo_id: str) -> DatasetMetadata:
@@ -45,9 +53,13 @@ class _StubRepoCache:
         self.repo_dir = repo_dir
         self.dataset_dir = dataset_dir
 
-    def ensure_local(self, repo_id: str, repo_type: str = "model", allow_patterns=None) -> LocalRepository:  # noqa: D401
+    def ensure_local(
+        self, repo_id: str, repo_type: str = "model", allow_patterns=None
+    ) -> LocalRepository:  # noqa: D401
         if repo_type == "dataset":
-            return LocalRepository(repo_id=repo_id, repo_type=repo_type, path=self.dataset_dir)
+            return LocalRepository(
+                repo_id=repo_id, repo_type=repo_type, path=self.dataset_dir
+            )
         return LocalRepository(repo_id=repo_id, repo_type=repo_type, path=self.repo_dir)
 
 
@@ -59,7 +71,10 @@ def test_context_builder_populates_fields(tmp_path: Path) -> None:
     dataset_dir.mkdir()
     (dataset_dir / "README.md").write_text("Dataset", encoding="utf-8")
 
-    builder = ContextBuilder(hf_client=_StubHfClient(tmp_path), repo_cache=_StubRepoCache(repo_dir, dataset_dir))
+    builder = ContextBuilder(
+        hf_client=_StubHfClient(tmp_path),
+        repo_cache=_StubRepoCache(repo_dir, dataset_dir),
+    )
     target = ScoreTarget(
         model_url="https://huggingface.co/demo/model",
         dataset_urls=["https://huggingface.co/datasets/demo/dataset"],

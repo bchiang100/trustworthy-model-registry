@@ -1,11 +1,11 @@
 """Utilities to derive the aggregated net score."""
+
 from __future__ import annotations
 
 from typing import Mapping
 
 from acme_cli.types import EvaluationOutcome, MetricResult
 from acme_cli.utils import clamp, safe_div, timed_operation
-
 
 MetricWeights = Mapping[str, float]
 
@@ -21,7 +21,9 @@ _DEFAULT_WEIGHTS: dict[str, float] = {
 }
 
 
-def compute_net_score(outcome: EvaluationOutcome, weights: MetricWeights | None = None) -> MetricResult:
+def compute_net_score(
+    outcome: EvaluationOutcome, weights: MetricWeights | None = None
+) -> MetricResult:
     weights = dict(weights or _DEFAULT_WEIGHTS)
     with timed_operation() as elapsed:
         score = 0.0
