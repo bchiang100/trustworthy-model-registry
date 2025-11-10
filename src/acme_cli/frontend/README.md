@@ -11,9 +11,8 @@ Files
 - app.js — simple client-side logic and mock data (uses localStorage)
 
 How to run (Windows PowerShell)
-1. Open PowerShell and change directory to the workspace folder where this project lives, for example:
+1. Open terminal and change directory to where this project lives:
 
-   cd 'c:\Users\pptim\Documents\programming challenges\playground'
 
 2. Start a simple HTTP server (Python 3 required):
 
