@@ -29,6 +29,7 @@ src/acme_cli/metrics/license.py
 src/acme_cli/metrics/performance.py
 src/acme_cli/metrics/ramp_up.py
 src/acme_cli/metrics/registry.py
+src/acme_cli/metrics/reproducibility.py
 src/acme_cli/metrics/size.py
 tests/test_context.py
 tests/test_hf_client.py
@@ -38,6 +39,7 @@ tests/test_llm.py
 tests/test_metrics.py
 tests/test_metrics_registry.py
 tests/test_net_score.py
+tests/test_reproducibility.py
 tests/test_runner.py
 tests/test_scoring.py
 tests/test_scoring_engine.py
