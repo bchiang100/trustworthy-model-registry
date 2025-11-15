@@ -3,3 +3,24 @@
 */.DS_Store
 **/.DS_Store
 model_process.log
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.so
+
+# Ignore Python virtual environment
+.venv
+
+# Ignore Python build files
+build
+dist
+*.egg-info
+
+# Ignore Python test files
+.pytest_cache
+.coverage
+htmlcov
+
+# Ignore Python virtual environment
+venv
