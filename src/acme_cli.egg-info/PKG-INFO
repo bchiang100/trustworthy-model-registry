@@ -18,6 +18,7 @@ Requires-Dist: pytest>=8.3; extra == "dev"
 Requires-Dist: pytest-cov>=5.0; extra == "dev"
 Requires-Dist: pytest-mock>=3.14; extra == "dev"
 Requires-Dist: respx>=0.21; extra == "dev"
+Requires-Dist: selenium>=4.15; extra == "dev"
 
 # ACME Trustworthy Model CLI
 

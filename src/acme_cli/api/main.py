@@ -1,4 +1,6 @@
 # How to Test:
+# Start server: uvicorn src.acme_cli.api.main:app --host 0.0.0.0 --port 8000
+
 # Test if server is running: curl http://localhost:8000/
 # List all models: curl http://localhost:8000/api/v1/models
 # Get a specific model: curl http://localhost:8000/api/v1/models/model-001

@@ -22,6 +22,7 @@ dev = [
     "pytest-cov>=5.0",
     "pytest-mock>=3.14",
     "respx>=0.21",
+    "selenium>=4.15",
 ]
 
 [build-system]
