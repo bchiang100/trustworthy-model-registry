@@ -21,6 +21,8 @@ How to run (Windows PowerShell)
 3. Open the frontend in your browser:
 
    http://localhost:8000/mock_registry_frontend/
+   or
+   http://localhost:8000/src/acme_cli/frontend/
 
 Notes
 - This is a mock UI. All operations are client-side and stored in localStorage.
