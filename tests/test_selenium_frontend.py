@@ -8,23 +8,25 @@ Selenium tests for the frontend model registry interface.
 # Run command: pytest tests/test_selenium_frontend.py -v
 # run this from the project root
 
+from urllib.error import URLError
+from urllib.request import urlopen
+
 import pytest
-import requests
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 def is_server_running():
     """Check if the frontend server is running."""
     try:
-        response = requests.get(
+        with urlopen(
             "http://localhost:8000/src/acme_cli/frontend", timeout=5
-        )
-        return response.status_code == 200
-    except requests.exceptions.RequestException:
+        ) as response:
+            return response.status == 200
+    except (URLError, OSError):
         return False
 
 
