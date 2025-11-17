@@ -1,6 +1,7 @@
 """
 Selenium tests for the frontend model registry interface.
 """
+
 # runs setup, loading, and navigation tests
 # 8 frontend tests total
 
@@ -8,11 +9,28 @@ Selenium tests for the frontend model registry interface.
 # run this from the project root
 
 import pytest
+import requests
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+
+
+def is_server_running():
+    """Check if the frontend server is running."""
+    try:
+        response = requests.get(
+            "http://localhost:8000/src/acme_cli/frontend", timeout=5
+        )
+        return response.status_code == 200
+    except requests.exceptions.RequestException:
+        return False
+
+
+skip_if_no_server = pytest.mark.skipif(
+    not is_server_running(), reason="Frontend server not running at localhost:8000"
+)
 
 
 @pytest.fixture
@@ -29,10 +47,11 @@ def driver():
     driver.quit()
 
 
+@skip_if_no_server
 class TestFrontendNavigation:
     """Test navigation between frontend pages."""
 
-    BASE_URL = "http://localhost:8000"
+    BASE_URL = "http://localhost:8000/src/acme_cli/frontend"
 
     def test_homepage_loads(self, driver):
         """Test that the homepage loads successfully."""
@@ -50,7 +69,13 @@ class TestFrontendNavigation:
         driver.get(self.BASE_URL)
 
         nav_links = driver.find_elements(By.CSS_SELECTOR, "nav a")
-        expected_links = ["Home", "Upload", "Ingest", "License Check", "Enumerate / Search"]
+        expected_links = [
+            "Home",
+            "Upload",
+            "Ingest",
+            "License Check",
+            "Enumerate / Search",
+        ]
 
         actual_links = [link.text for link in nav_links]
         for expected in expected_links:
@@ -98,10 +123,11 @@ class TestFrontendNavigation:
         assert "enumerate.html" in driver.current_url
 
 
+@skip_if_no_server
 class TestFrontendFunctionality:
     """Test frontend form functionality."""
 
-    BASE_URL = "http://localhost:8000"
+    BASE_URL = "http://localhost:8000/src/acme_cli/frontend"
 
     def test_upload_form_exists(self, driver):
         """Test that upload form exists and has required fields."""
@@ -114,16 +140,17 @@ class TestFrontendFunctionality:
         """Test search functionality on enumerate page."""
         driver.get(f"{self.BASE_URL}/enumerate.html")
 
-        search_elements = driver.find_elements(By.CSS_SELECTOR,
-                                             "input[type='search'], input[type='text'], button")
+        search_elements = driver.find_elements(
+            By.CSS_SELECTOR, "input[type='search'], input[type='text'], button"
+        )
         assert len(search_elements) > 0, "No search elements found"
 
 
-
+@skip_if_no_server
 class TestFrontendPerformance:
     """Test frontend performance and loading."""
 
-    BASE_URL = "http://localhost:8000"
+    BASE_URL = "http://localhost:8000/src/acme_cli/frontend"
 
     def test_page_load_time(self, driver):
         """Test that pages load within reasonable time."""
@@ -139,5 +166,3 @@ class TestFrontendPerformance:
 
         load_time = time.time() - start_time
         assert load_time < 5, f"Page took too long to load: {load_time}s"
-
-
