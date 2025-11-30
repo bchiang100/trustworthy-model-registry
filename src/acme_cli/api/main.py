@@ -7,10 +7,27 @@
 ## curl -X POST "http://localhost:8000/api/v1/models/upload?name=verify-test&version=1.0.0" -F "file=@/tmp/test.zip"
 # Test HuggingFace ingest: curl -X POST "http://localhost:8000/api/v1/models/ingest?huggingface_url=https://huggingface.co/gpt2"
 
+# ------ Health Dashboard ------
+
+# How to Start Server & Open Dashboard:
+# 1. Install dependencies: python3 -m pip install -e .
+# 2. Start the server: python3 -m acme_cli.api.server
+# 3. Server will be running at: http://localhost:8000
+# 4. Open the health dashboard: http://localhost:8000/api/v1/health/dashboard/ui
+# 5. Just need the data? Try: http://localhost:8000/api/v1/health/dashboard
+
+# What Dashboard Shows:
+# - Live system health: CPU, memory, disk usage (updates every 30 seconds)
+# - Registry activity: uploads, downloads, and searches in the past hour
+# - Performance stats: Average response times, error counts, throughput
+# - Recent logs: System events and API requests with timestamps
+# - Status indicators: Green = healthy, yellow = warning, red = error
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import health, models
+from .middleware import MetricsMiddleware
 
 app = FastAPI(
     title="ACME Trustworthy Model Registry",
@@ -25,6 +42,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add metrics collection middleware
+app.add_middleware(MetricsMiddleware)
 
 app.include_router(
     health.router, prefix="/api/v1", tags=["health"]
