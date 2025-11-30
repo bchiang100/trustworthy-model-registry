@@ -14,7 +14,6 @@
 # 2. Start the server: python3 -m acme_cli.api.server
 # 3. Server will be running at: http://localhost:8000
 # 4. Open the health dashboard: http://localhost:8000/api/v1/health/dashboard/ui
-# 5. Just need the data? Try: http://localhost:8000/api/v1/health/dashboard
 
 # What Dashboard Shows:
 # - Live system health: CPU, memory, disk usage (updates every 30 seconds)
