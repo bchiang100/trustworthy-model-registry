@@ -13,6 +13,7 @@ Requires-Dist: cachetools>=5.3
 Requires-Dist: fastapi>=0.104
 Requires-Dist: uvicorn[standard]>=0.24
 Requires-Dist: python-multipart>=0.0.6
+Requires-Dist: psutil>=5.9.0
 Provides-Extra: dev
 Requires-Dist: pytest>=8.3; extra == "dev"
 Requires-Dist: pytest-cov>=5.0; extra == "dev"
