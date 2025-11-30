@@ -47,5 +47,6 @@ tests/test_net_score.py
 tests/test_runner.py
 tests/test_scoring.py
 tests/test_scoring_engine.py
+tests/test_selenium_frontend.py
 tests/test_urls.py
 tests/test_utils.py
