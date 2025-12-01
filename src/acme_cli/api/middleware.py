@@ -1,6 +1,7 @@
 """Middleware for collecting metrics and monitoring requests."""
 
 import time
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
