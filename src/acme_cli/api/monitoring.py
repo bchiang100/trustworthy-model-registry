@@ -1,12 +1,13 @@
 """System monitoring and metrics collection for health dashboard."""
 
 import logging
+import threading
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
 import psutil
-import threading
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
