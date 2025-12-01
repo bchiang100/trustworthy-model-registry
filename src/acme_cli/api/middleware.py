@@ -37,12 +37,12 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         response_time_ms = (end_time - start_time) * 1000
 
         # Record metrics (skip health endpoint to avoid circular logging)
-        if not endpoint.startswith('/api/v1/health'):
+        if not endpoint.startswith("/api/v1/health"):
             self.metrics_collector.record_request(
                 endpoint=endpoint,
                 method=method,
                 status_code=status_code,
-                response_time_ms=response_time_ms
+                response_time_ms=response_time_ms,
             )
 
         # Add response headers for monitoring
