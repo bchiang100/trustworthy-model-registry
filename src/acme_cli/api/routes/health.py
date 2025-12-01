@@ -1,10 +1,6 @@
 """Health check endpoints for system monitoring and dashboard."""
 
-import asyncio
-import os
-import psutil
 from datetime import datetime, timedelta
-from typing import Dict, List, Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
@@ -31,14 +27,14 @@ async def health_check():
                 "database": "connected",
                 "storage": "available",
                 "memory_usage": system_stats.get("memory_percent"),
-                "cpu_usage": system_stats.get("cpu_percent")
+                "cpu_usage": system_stats.get("cpu_percent"),
             },
         }
     except Exception as e:
         return {
             "status": "degraded",
             "timestamp": datetime.utcnow().isoformat(),
-            "error": str(e)
+            "error": str(e),
         }
 
 
@@ -53,21 +49,25 @@ async def health_dashboard():
         # Collect all metrics
         metrics_data = await metrics_collector.get_metrics_summary(start_time, end_time)
         system_stats = await system_monitor.get_system_stats()
-        activity_stats = await metrics_collector.get_activity_stats(start_time, end_time)
+        activity_stats = await metrics_collector.get_activity_stats(
+            start_time, end_time
+        )
 
         return {
             "timestamp": end_time.isoformat(),
             "time_range": {
                 "start": start_time.isoformat(),
-                "end": end_time.isoformat()
+                "end": end_time.isoformat(),
             },
             "system_health": {
-                "status": "healthy" if system_stats.get("cpu_percent", 0) < 80 else "warning",
+                "status": (
+                    "healthy" if system_stats.get("cpu_percent", 0) < 80 else "warning"
+                ),
                 "uptime": system_stats.get("uptime"),
                 "cpu_usage_percent": system_stats.get("cpu_percent"),
                 "memory_usage_percent": system_stats.get("memory_percent"),
                 "disk_usage_percent": system_stats.get("disk_percent"),
-                "network_io": system_stats.get("network_io")
+                "network_io": system_stats.get("network_io"),
             },
             "registry_activity": {
                 "total_requests": activity_stats.get("total_requests", 0),
@@ -75,14 +75,16 @@ async def health_dashboard():
                 "model_downloads": activity_stats.get("downloads", 0),
                 "search_queries": activity_stats.get("searches", 0),
                 "error_count": activity_stats.get("errors", 0),
-                "average_response_time_ms": activity_stats.get("avg_response_time", 0)
+                "average_response_time_ms": activity_stats.get("avg_response_time", 0),
             },
             "performance_metrics": metrics_data.get("performance", {}),
             "recent_logs": await metrics_collector.get_recent_logs(limit=50),
-            "alerts": await system_monitor.get_active_alerts()
+            "alerts": await system_monitor.get_active_alerts(),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get dashboard data: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get dashboard data: {str(e)}"
+        )
 
 
 @router.get("/health/metrics")
@@ -96,7 +98,7 @@ async def get_metrics(hours: int = 1):
         return {
             "timestamp": end_time.isoformat(),
             "time_range_hours": hours,
-            "metrics": metrics
+            "metrics": metrics,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get metrics: {str(e)}")
@@ -110,7 +112,7 @@ async def get_logs(limit: int = 100, level: str = "INFO"):
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "logs": logs,
-            "count": len(logs)
+            "count": len(logs),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get logs: {str(e)}")
