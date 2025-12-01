@@ -4,8 +4,11 @@
 # Get a specific model: curl http://localhost:8000/api/v1/models/model-001
 # Test Download: curl http://localhost:8000/api/v1/models/model-001/download
 # Test Upload: echo "fake content" > /tmp/test.zip
-## curl -X POST "http://localhost:8000/api/v1/models/upload?name=verify-test&version=1.0.0" -F "file=@/tmp/test.zip"
-# Test HuggingFace ingest: curl -X POST "http://localhost:8000/api/v1/models/ingest?huggingface_url=https://huggingface.co/gpt2"
+# curl -X POST "http://localhost:8000/api/v1/models/upload" \
+#   "?name=verify-test&version=1.0.0" -F "file=@/tmp/test.zip"
+# Test HuggingFace ingest:
+# curl -X POST "http://localhost:8000/api/v1/models/ingest" \
+#   "?huggingface_url=https://huggingface.co/gpt2"
 
 # ------ Health Dashboard ------
 
@@ -13,7 +16,8 @@
 # 1. Install dependencies: python3 -m pip install -e .
 # 2. Start the server: python3 -m acme_cli.api.server
 # 3. Server will be running at: http://localhost:8000
-# 4. Open the health dashboard: http://localhost:8000/api/v1/health/dashboard/ui
+# 4. Open the health dashboard:
+#    http://localhost:8000/api/v1/health/dashboard/ui
 
 # What Dashboard Shows:
 # - Live system health: CPU, memory, disk usage (updates every 30 seconds)
