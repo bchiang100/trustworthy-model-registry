@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Iterable
+from typing import Iterable, Callable, Optional
 
 from acme_cli.llm import LlmEvaluator
 from acme_cli.metrics.base import Metric
@@ -18,9 +18,9 @@ from acme_cli.metrics.size import SizeMetric
 from acme_cli.types import EvaluationOutcome, MetricFailure, MetricResult, ModelContext
 
 
-def build_metrics(llm: LlmEvaluator | None = None) -> list[Metric]:
+def build_metrics(llm: LlmEvaluator | None = None, include_tree_score: bool = False, score_fn: Optional[Callable[[str], float]] = None) -> list[Metric]:
     shared_llm = llm or LlmEvaluator()
-    return [
+    metrics = [
         RampUpMetric(shared_llm),
         BusFactorMetric(),
         PerformanceClaimsMetric(shared_llm),
@@ -30,6 +30,22 @@ def build_metrics(llm: LlmEvaluator | None = None) -> list[Metric]:
         DatasetQualityMetric(),
         CodeQualityMetric(),
     ]
+    
+    # Optionally include tree score metric
+    if include_tree_score:
+        from acme_cli.metrics.tree_score import TreeScoreMetric
+        # If no score_fn provided, create a default one that computes and caches
+        # scores using the filesystem-backed registry and ModelScorer.
+        if score_fn is None:
+            from acme_cli.score_helpers import make_score_fn
+            from acme_cli.score_registry import FileSystemScoreRegistry
+
+            registry = FileSystemScoreRegistry()
+            score_fn = make_score_fn(registry=registry)
+
+        metrics.append(TreeScoreMetric(score_fn=score_fn))
+    
+    return metrics
 
 
 def evaluate_metrics(context: ModelContext, metrics: Iterable[Metric]) -> EvaluationOutcome:
