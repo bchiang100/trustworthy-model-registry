@@ -112,7 +112,7 @@ async def validation_exception_handler(
     return Response(status_code=400)
 
 # python dict to hold metdata of artifacts
-# -> name, type, id, url, downloadable s3 url
+# id -> name, type, url, downloadable s3 url
 artifacts_metadata = {} 
 
 class RegexSearch(BaseModel):
@@ -255,10 +255,6 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
     # create id
     id = make_id(artifact_url)
 
-    # if no id generated, return 0
-    if not id:
-        return 0
-
     if rating >= 0.5: # trustworthy
         try:
             # download artifact from huggingface
@@ -330,8 +326,8 @@ async def get_artifacts(request: RegexSearch):
             artifact_dict = {"name" : name, "id" : artifact_id, "type": type}
             matching_artifacts.append(artifact_dict) 
 
-        if time.monotonic - start_time > 5: # regex is bad or causing too much backtracking
-            Response(status_code=400)
+        if time.monotonic - start_time > 5: # regex is bad or causing too much backtracking, search time is > 3 seconds
+            Response(status_code=400) # invalid regex
 
     # zero regex matches
     if len(matching_artifacts) == 0:
