@@ -1,4 +1,5 @@
 """Top-level command handlers for the ACME CLI."""
+
 from __future__ import annotations
 
 import os
@@ -6,7 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Sequence
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"

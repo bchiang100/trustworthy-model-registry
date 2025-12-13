@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Enumerate / Search — Mock Registry</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Enumerate / Regex Search — Mock UI</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="upload.html">Upload</a>
+      <a href="ingest.html">Ingest</a>
+      <a href="license_check.html">License Check</a>
+      <a href="enumerate.html">Enumerate / Search</a>
+    </nav>
+  </header>
+  <main>
+    <section class="card">
+      <h2>Regex search</h2>
+      <p class="muted">Enter a JavaScript-style regular expression (no delimiters). Matches name, description, license, or URL.</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="q" type="text" placeholder="e.g. gpt|vision|apache" />
+        <button onclick="enumerateSearch(document.getElementById('q').value, 'results')">Search</button>
+      </div>
+      <div id="results" style="margin-top:12px"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

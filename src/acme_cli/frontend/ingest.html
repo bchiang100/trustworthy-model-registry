@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ingest — Mock Registry</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Ingest — Mock UI</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="upload.html">Upload</a>
+      <a href="ingest.html">Ingest</a>
+      <a href="license_check.html">License Check</a>
+      <a href="enumerate.html">Enumerate / Search</a>
+    </nav>
+  </header>
+  <main>
+  <section class="card stacked">
+      <h2>Ingest URL</h2>
+      <p class="muted">Provide a Hugging Face model URL (e.g. https://huggingface.co/author/model) to start ingestion via the backend. The API will validate Hugging Face URLs.</p>
+      <form onsubmit="event.preventDefault(); doIngest(this)">
+        <label>Hugging Face model URL</label>
+        <input name="url" type="url" placeholder="https://huggingface.co/author/model-name" />
+        <label>Threshold (0–1)</label>
+        <input name="threshold" type="text" value="0.5" />
+        <div style="margin-top:12px"><button type="submit">Start ingest</button></div>
+      </form>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -16,6 +16,14 @@ src/acme_cli.egg-info/SOURCES.txt
 src/acme_cli.egg-info/dependency_links.txt
 src/acme_cli.egg-info/requires.txt
 src/acme_cli.egg-info/top_level.txt
+src/acme_cli/api/__init__.py
+src/acme_cli/api/main.py
+src/acme_cli/api/middleware.py
+src/acme_cli/api/monitoring.py
+src/acme_cli/api/server.py
+src/acme_cli/api/routes/__init__.py
+src/acme_cli/api/routes/health.py
+src/acme_cli/api/routes/models.py
 src/acme_cli/hf/__init__.py
 src/acme_cli/hf/client.py
 src/acme_cli/hf/local_cache.py
@@ -43,5 +51,6 @@ tests/test_reproducibility.py
 tests/test_runner.py
 tests/test_scoring.py
 tests/test_scoring_engine.py
+tests/test_selenium_frontend.py
 tests/test_urls.py
 tests/test_utils.py
