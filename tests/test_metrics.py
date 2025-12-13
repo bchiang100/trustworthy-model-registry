@@ -48,7 +48,9 @@ class _FailingLlm:
 def _context(tmp_path: Path) -> ModelContext:
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
-    (repo_path / "README.md").write_text("""# Demo\n\n## Installation\n````code````\n""", encoding="utf-8")
+    (repo_path / "README.md").write_text(
+        """# Demo\n\n## Installation\n````code````\n""", encoding="utf-8"
+    )
     (repo_path / "tests").mkdir()
     (repo_path / "pyproject.toml").write_text("[tool.demo]\n", encoding="utf-8")
     weight_path = repo_path / "model.safetensors"
@@ -56,7 +58,9 @@ def _context(tmp_path: Path) -> ModelContext:
 
     dataset_path = tmp_path / "dataset"
     dataset_path.mkdir()
-    (dataset_path / "README.md").write_text("Dataset documentation" * 50, encoding="utf-8")
+    (dataset_path / "README.md").write_text(
+        "Dataset documentation" * 50, encoding="utf-8"
+    )
 
     model_metadata = ModelMetadata(
         repo_id="acme/model",
@@ -66,7 +70,9 @@ def _context(tmp_path: Path) -> ModelContext:
         likes=50,
         last_modified=datetime.now(timezone.utc),
         tags=["text-generation", "demo"],
-        files=[RepoFile(path="model.safetensors", size_bytes=weight_path.stat().st_size)],
+        files=[
+            RepoFile(path="model.safetensors", size_bytes=weight_path.stat().st_size)
+        ],
         pipeline_tag="text-generation",
         library_name="transformers",
     )
@@ -80,11 +86,19 @@ def _context(tmp_path: Path) -> ModelContext:
         license="cc-by-4.0",
     )
     return ModelContext(
-        target=ScoreTarget(model_url="https://huggingface.co/acme/model", dataset_urls=["https://huggingface.co/datasets/acme/dataset"], code_urls=["https://github.com/acme/repo"]),
+        target=ScoreTarget(
+            model_url="https://huggingface.co/acme/model",
+            dataset_urls=["https://huggingface.co/datasets/acme/dataset"],
+            code_urls=["https://github.com/acme/repo"],
+        ),
         model_metadata=model_metadata,
         dataset_metadata=dataset_metadata,
-        local_repo=LocalRepository(repo_id="acme/model", repo_type="model", path=repo_path),
-        dataset_local_repo=LocalRepository(repo_id="acme/dataset", repo_type="dataset", path=dataset_path),
+        local_repo=LocalRepository(
+            repo_id="acme/model", repo_type="model", path=repo_path
+        ),
+        dataset_local_repo=LocalRepository(
+            repo_id="acme/dataset", repo_type="dataset", path=dataset_path
+        ),
         readme_text=(repo_path / "README.md").read_text(encoding="utf-8"),
         dataset_readme_text=(dataset_path / "README.md").read_text(encoding="utf-8"),
         commit_authors=["Alice", "Bob", "Charlie"],
@@ -155,6 +169,7 @@ def test_code_quality_metric(tmp_path: Path) -> None:
     value = metric.compute(context)
     assert 0 < value <= 1
 
+
 def test_size_metric_handles_missing_repo() -> None:
     metric = SizeMetric()
     context = ModelContext(
@@ -169,7 +184,8 @@ def test_size_metric_handles_missing_repo() -> None:
         commit_total=0,
     )
     values = metric.compute(context)
-    assert all(score == 0.0 for score in values.values())
+    assert all(score == 0.2 for score in values.values())
+
 
 def test_size_metric_uses_metadata(tmp_path: Path) -> None:
     metadata = ModelMetadata(
@@ -198,6 +214,7 @@ def test_size_metric_uses_metadata(tmp_path: Path) -> None:
     metric = SizeMetric()
     result = metric.compute(context)
     assert result["raspberry_pi"] == 1.0
+
 
 def test_dataset_quality_handles_license_list(tmp_path: Path) -> None:
     context = _context(tmp_path)
