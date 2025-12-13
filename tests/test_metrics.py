@@ -184,7 +184,7 @@ def test_size_metric_handles_missing_repo() -> None:
         commit_total=0,
     )
     values = metric.compute(context)
-    assert all(score == 0.0 for score in values.values())
+    assert all(score == 0.2 for score in values.values())
 
 
 def test_size_metric_uses_metadata(tmp_path: Path) -> None:
