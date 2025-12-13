@@ -1,4 +1,5 @@
 """User-facing scoring pipeline producing NDJSON output."""
+
 from __future__ import annotations
 
 import json
@@ -41,7 +42,9 @@ def _score_target(scorer: ModelScorer, target: ScoreTarget) -> dict[str, Any]:
         outcome = summary.outcome
         net_metric = compute_net_score(outcome)
         outcome.metrics[net_metric.name] = net_metric
-        record = _build_record(summary.context.target.model_url, summary.context, outcome)
+        record = _build_record(
+            summary.context.target.model_url, summary.context, outcome
+        )
         if outcome.failures:
             for failure in outcome.failures:
                 LOGGER.warning("Metric %s failed: %s", failure.name, failure.message)
@@ -67,7 +70,12 @@ def _build_record(model_url: str, context, outcome) -> dict[str, Any]:  # type: 
     record.update(_metric_field(outcome, "code_quality", 0.0))
     size_value, size_latency = _metric_value(outcome, "size_score", {})
     if not size_value:
-        size_value = {"raspberry_pi": 0.0, "jetson_nano": 0.0, "desktop_pc": 0.0, "aws_server": 0.0}
+        size_value = {
+            "raspberry_pi": 0.0,
+            "jetson_nano": 0.0,
+            "desktop_pc": 0.0,
+            "aws_server": 0.0,
+        }
     record["size_score"] = size_value
     record["size_score_latency"] = size_latency
     return record
@@ -110,7 +118,12 @@ def _empty_record(model_url: str, error: str | None = None) -> dict[str, Any]:
         "performance_claims_latency": 0,
         "license": 0.0,
         "license_latency": 0,
-        "size_score": {"raspberry_pi": 0.0, "jetson_nano": 0.0, "desktop_pc": 0.0, "aws_server": 0.0},
+        "size_score": {
+            "raspberry_pi": 0.0,
+            "jetson_nano": 0.0,
+            "desktop_pc": 0.0,
+            "aws_server": 0.0,
+        },
         "size_score_latency": 0,
         "dataset_and_code_score": 0.0,
         "dataset_and_code_score_latency": 0,

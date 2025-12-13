@@ -1,4 +1,5 @@
 """Utility helpers shared across the project."""
+
 from __future__ import annotations
 
 import re
@@ -53,5 +54,3 @@ def contains_keywords(text: str | None, keywords: Iterable[str]) -> int:
         return 0
     lowered = text.lower()
     return sum(lowered.count(keyword.lower()) for keyword in keywords)
-
-

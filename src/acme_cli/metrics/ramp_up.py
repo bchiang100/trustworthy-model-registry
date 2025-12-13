@@ -1,4 +1,5 @@
 """Ramp-up metric implementation."""
+
 from __future__ import annotations
 
 from acme_cli.llm import LlmEvaluator, LlmUnavailable
@@ -33,7 +34,13 @@ class RampUpMetric(Metric):
     def _heuristic_score(readme: str) -> float:
         wc = word_count(readme)
         richness = clamp(wc / 1000.0)
-        keyword_bonus = 0.1 if contains_keywords(readme, ["installation", "usage", "quickstart", "example"]) else 0.0
+        keyword_bonus = (
+            0.1
+            if contains_keywords(
+                readme, ["installation", "usage", "quickstart", "example"]
+            )
+            else 0.0
+        )
         code_bonus = min(0.2, count_code_fences(readme) * 0.05)
         return clamp(richness + keyword_bonus + code_bonus)
 
