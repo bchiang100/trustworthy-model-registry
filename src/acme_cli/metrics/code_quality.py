@@ -24,22 +24,52 @@ class CodeQualityMetric(Metric):
         # Check for reputable organization or model quality indicators
         org_bonus = 0.0
         readme_text = context.readme_text.lower() if context.readme_text else ""
-        dataset_readme = context.dataset_readme_text.lower() if context.dataset_readme_text else ""
+        dataset_readme = (
+            context.dataset_readme_text.lower() if context.dataset_readme_text else ""
+        )
         all_text = readme_text + " " + dataset_readme
 
         # Check model metadata for quality indicators
         model_name = ""
         if context.model_metadata:
             try:
-                model_name = getattr(context.model_metadata, 'model_id', getattr(context.model_metadata, 'id', '')).lower()
+                model_name = getattr(
+                    context.model_metadata,
+                    "model_id",
+                    getattr(context.model_metadata, "id", ""),
+                ).lower()
             except:
                 model_name = ""
 
         # High reputation organizations or models
-        if any(org in all_text + " " + model_name for org in ["anthropic", "openai", "google", "microsoft", "meta", "huggingface", "tongyi", "alibaba"]):
+        if any(
+            org in all_text + " " + model_name
+            for org in [
+                "anthropic",
+                "openai",
+                "google",
+                "microsoft",
+                "meta",
+                "huggingface",
+                "tongyi",
+                "alibaba",
+            ]
+        ):
             org_bonus = 1.0
         # Secondary quality indicators
-        elif any(indicator in all_text + " " + model_name for indicator in ["diffusion", "transformer", "llama", "bert", "gpt", "image", "turbo", "vision"]):
+        elif any(
+            indicator in all_text + " " + model_name
+            for indicator in [
+                "diffusion",
+                "transformer",
+                "llama",
+                "bert",
+                "gpt",
+                "image",
+                "turbo",
+                "vision",
+            ]
+        ):
             org_bonus = 0.9
         # Basic model repository with documentation
         elif readme_text and len(readme_text) > 100:
@@ -61,13 +91,16 @@ class CodeQualityMetric(Metric):
             typing_score = 0.6  # Higher score for type hints
 
         # Enhanced scoring for modern ML repositories
-        score = min(1.0, (
-            0.1 * py_count_score
-            + 0.05 * doc_score
-            + 0.05 * test_score
-            + 0.05 * max(lint_score, typing_score)
-            + 0.75 * org_bonus  # Dominant weight for organization/model quality
-        ))
+        score = min(
+            1.0,
+            (
+                0.1 * py_count_score
+                + 0.05 * doc_score
+                + 0.05 * test_score
+                + 0.05 * max(lint_score, typing_score)
+                + 0.75 * org_bonus  # Dominant weight for organization/model quality
+            ),
+        )
         return clamp(score)
 
 
