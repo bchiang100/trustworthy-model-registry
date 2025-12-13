@@ -31,20 +31,50 @@ class DatasetQualityMetric(Metric):
 
         # Check for reputable organization
         organization_bonus = 0.0
-        dataset_readme = context.dataset_readme_text.lower() if context.dataset_readme_text else ""
-        dataset_id = getattr(metadata, 'id', '').lower() if metadata else ""
+        dataset_readme = (
+            context.dataset_readme_text.lower() if context.dataset_readme_text else ""
+        )
+        dataset_id = getattr(metadata, "id", "").lower() if metadata else ""
 
         # Top-tier AI safety and research organizations
-        if any(org in dataset_readme + " " + dataset_id for org in ["anthropic", "openai", "google", "microsoft", "meta"]):
+        if any(
+            org in dataset_readme + " " + dataset_id
+            for org in ["anthropic", "openai", "google", "microsoft", "meta"]
+        ):
             organization_bonus = 1.0
         # High-quality AI companies and platforms
-        elif any(org in dataset_readme + " " + dataset_id for org in ["huggingface", "deepseek", "alibaba", "tongyi"]):
+        elif any(
+            org in dataset_readme + " " + dataset_id
+            for org in ["huggingface", "deepseek", "alibaba", "tongyi"]
+        ):
             organization_bonus = 0.9
         # Research institutions and quality dataset indicators
-        elif any(indicator in dataset_readme + " " + dataset_id for indicator in ["stanford", "mit", "berkeley", "interviewer", "conversation", "instruction", "constitutional", "helpful", "harmless"]):
+        elif any(
+            indicator in dataset_readme + " " + dataset_id
+            for indicator in [
+                "stanford",
+                "mit",
+                "berkeley",
+                "interviewer",
+                "conversation",
+                "instruction",
+                "constitutional",
+                "helpful",
+                "harmless",
+            ]
+        ):
             organization_bonus = 0.8
         # General quality indicators for good datasets
-        elif any(keyword in dataset_readme for keyword in ["evaluation", "benchmark", "curated", "annotated", "validated"]):
+        elif any(
+            keyword in dataset_readme
+            for keyword in [
+                "evaluation",
+                "benchmark",
+                "curated",
+                "annotated",
+                "validated",
+            ]
+        ):
             organization_bonus = 0.6
 
         governance_component = 0.0

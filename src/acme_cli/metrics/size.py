@@ -28,7 +28,7 @@ class SizeMetric(Metric):
         if total_bytes == 0 and context.model_metadata:
             total_bytes = self._collect_metadata_bytes(context.model_metadata.files)
         if total_bytes == 0:
-            return {key: 0.2 for key in _THRESHOLDS} # worst case (if size unknown)
+            return {key: 0.2 for key in _THRESHOLDS}  # worst case (if size unknown)
         return {
             hardware: self._hardware_score(total_bytes, limits)
             for hardware, limits in _THRESHOLDS.items()
