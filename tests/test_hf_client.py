@@ -52,7 +52,9 @@ class _StubApi:
             _Commit([_Author(email="carol@example.com")]),
         ]
 
-    def list_repo_files(self, repo_id: str, repo_type: str = "model") -> list[str]:  # noqa: D401
+    def list_repo_files(
+        self, repo_id: str, repo_type: str = "model"
+    ) -> list[str]:  # noqa: D401
         return ["README.md", "model.safetensors"]
 
 
