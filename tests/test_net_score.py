@@ -8,7 +8,16 @@ def test_compute_net_score_with_complete_metrics() -> None:
         "bus_factor": MetricResult("bus_factor", 0.6, 5),
         "performance_claims": MetricResult("performance_claims", 0.7, 7),
         "license": MetricResult("license", 1.0, 3),
-        "size_score": MetricResult("size_score", {"raspberry_pi": 0.9, "jetson_nano": 0.7, "desktop_pc": 0.6, "aws_server": 0.5}, 4),
+        "size_score": MetricResult(
+            "size_score",
+            {
+                "raspberry_pi": 0.9,
+                "jetson_nano": 0.7,
+                "desktop_pc": 0.6,
+                "aws_server": 0.5,
+            },
+            4,
+        ),
         "dataset_and_code_score": MetricResult("dataset_and_code_score", 0.9, 6),
         "dataset_quality": MetricResult("dataset_quality", 0.8, 2),
         "code_quality": MetricResult("code_quality", 0.7, 5),

@@ -1,4 +1,5 @@
 """Metric registry and execution engine."""
+
 from __future__ import annotations
 
 import os
@@ -50,13 +51,19 @@ def build_metrics(llm: LlmEvaluator | None = None, include_tree_score: bool = Fa
     return metrics
 
 
-def evaluate_metrics(context: ModelContext, metrics: Iterable[Metric]) -> EvaluationOutcome:
+def evaluate_metrics(
+    context: ModelContext, metrics: Iterable[Metric]
+) -> EvaluationOutcome:
     metrics = list(metrics)
-    max_workers = min(len(metrics), int(os.getenv("ACME_MAX_WORKERS", os.cpu_count() or 4))) or 1
+    max_workers = (
+        min(len(metrics), int(os.getenv("ACME_MAX_WORKERS", os.cpu_count() or 4))) or 1
+    )
     results: dict[str, MetricResult] = {}
     failures: list[MetricFailure] = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_map = {executor.submit(metric.evaluate, context): metric for metric in metrics}
+        future_map = {
+            executor.submit(metric.evaluate, context): metric for metric in metrics
+        }
         for future in as_completed(future_map):
             metric = future_map[future]
             try:

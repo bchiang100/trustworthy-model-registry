@@ -1,4 +1,5 @@
 """Utilities for parsing and classifying artifact URLs."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -28,7 +29,7 @@ def parse_artifact_url(url: str) -> ParsedUrl:
 
     if host in _HF_HOSTS:
         parts = path.split("/")
-        if not parts or parts == ['']:
+        if not parts or parts == [""]:
             return ParsedUrl(url, "huggingface", "unknown", None)
         if parts[0] == "datasets" and len(parts) >= 3:
             repo_id = f"{parts[1]}/{parts[2]}"
