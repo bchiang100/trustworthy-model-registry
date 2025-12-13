@@ -192,10 +192,16 @@ async def get_lineage_graph(id: str) -> JSONResponse:
 
 # get cost of artifact
 @router.get("/artifact/{artifact_type}/{id}/cost/")
-async def get_artifact_cost(artifact_type: str, id: str) -> JSONResponse:
+async def get_artifact_cost(artifact_type: str, id: str, dependency: bool = False) -> JSONResponse:
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
     # check if id exists in the registry metadata db
     # if it does not, return 404
     # parse cost from artifact metadata
+    standalone_cost = 0
+    sub_costs = 0
+    if (dependency): 
+        # find costs of dependencies 
+        sub_costs = 1
+    total_cost = standalone_cost + sub_costs
     # return cost as json
