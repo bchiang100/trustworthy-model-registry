@@ -3,16 +3,40 @@
 import re
 from typing import List, Optional
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, JSONResponse, Response 
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, JSONResponse, Response, Request, RequestValidationError
 from pydantic import BaseModel
+from acme_cli.urls import parse_artifact_url, is_code_url, is_dataset_url, is_model_url
 
 router = APIRouter()
+
+@router.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+):
+    return Response(status_code=400)
 
 class RegexSearch(BaseModel):
     regex: str
 
+class IngestRequest(BaseModel):
+    url: str
+
+class ArtifactMetadata(BaseModel):
+    name: str
+    id: str 
+    type: str  # "model", "dataset", "code" 
+
+class ArtifactData(BaseModel):
+    url: str
+    download_url: str
+
 class LicenseCheckRequest(BaseModel):
     github_url: str
+
+class UpdateArtifactRequest(BaseModel):
+    metadata: ArtifactMetadata
+    data: ArtifactData
 
 class ModelMetadata(BaseModel):
     name: str
@@ -228,17 +252,17 @@ async def ingest_huggingface_model(
         "estimated_completion_time": "10 minutes",
     }
 
-# Get track
-@router.get("/tracks/")
-async def get_tracks():
-    return JSONResponse(content={"plannedTracks": "Performance track"}, status_code=200)
 
-# health check
+
+## SPEC COMPLIANT ENDPOINTS 
+
+# health check / heartbeat
 @router.get("/health/")
 async def get_health():
     # TODO: some ping to the system to ensure it is reachable? if we want to do this 
     return Response(status_code = 200)
 
+# query artifacts
 @router.post("/artifacts/")
 async def get_artifacts(offset: str = "0"):
     try:
@@ -247,6 +271,56 @@ async def get_artifacts(offset: str = "0"):
     except:
         return Response(status_code=403)
 
+# reset registry (remove all entries)
+@router.delete("/reset/")
+async def reset_registry():
+    # TODO: implement logic to batch enumerate from s3 and delete
+    # TODO: also clear metadata db 
+    return Response(status_code=200)
+
+# get specific artifact
+@router.get("/artifact/{artifact_type}/{id}/")
+async def get_artifact(artifact_type: str, id: str):
+    if artifact_type not in ["model", "dataset", "code"]:
+        return Response(status_code=400)
+    # check if id exists in the registry metadata db 
+    # if it does not, return 404
+    # parse artifact metadata from db 
+    # return artifact metadata as json 
+    pass
+
+# update specific artifact
+@router.put("/artifact/{artifact_type}/{id}/")
+async def update_artifact(artifact_type: str, id: str, update_request: UpdateArtifactRequest):
+    if artifact_type not in ["model", "dataset", "code"]:
+        return Response(status_code=400)
+    # check if name and id exists in the registry metadata db 
+    # if it does not, return 404
+    # parse artifact metadata from db 
+    # update artifact metadata in db 
+    # re-ingest with new link
+    pass
+
+# ingest artifact
+@router.put("/artifact/{artifact_type}/")
+async def ingest_artifact(artifact_type: str):
+    if artifact_type not in ["model", "dataset", "code"]:
+        return Response(status_code=400)
+    # create id 
+    # check if id exists in the registry metadata db
+    # if it does, return 409
+    # perform ratings 
+    # rating check
+    # if pass, ingest and return 201 with artifact metadata and urls as json
+    # if fail, return 424
+    pass
+
+# Get track
+@router.get("/tracks/")
+async def get_tracks():
+    return JSONResponse(content={"plannedTracks": "Performance track"}, status_code=200)
+
+# Regex search
 @router.post("/artifact/byRegEx/")
 async def get_artifacts(regex: RegexSearch):
     # TODO: some logic for regex to check validity of expression
@@ -254,8 +328,39 @@ async def get_artifacts(regex: RegexSearch):
     pattern = re.compile(regex="regex")
     return Response(status_code=403)
 
+# license check of model against github project 
+@router.post("/artifact/model/{id}/license-check/")
+async def check_license(id: str, project_url: LicenseCheckRequest) -> JSONResponse:
+    # check if id exists in the registry metadata db 
+    # if it does not, return 404
+    # check if artifact is a model
+    # if not, return 400 
+    # parse license from model metadata
+    # parse the project url to check if it is a valid github url
+    project = project_url.github_url
+    # if it is not, return 404 
+    # if it does, check the license against project url 
+    # if no license, return 502
+    # return status as true or false in json 
+    pass
 
-@router.delete("/reset/")
-async def reset_registry():
-    # TODO: implement logic to batch enumerate from s3 and delete
-    return Response(status_code=200)
+# get lineage graph of model
+@router.post("/artifact/model/{id}/lineage/")
+async def get_lineage_graph(id: str) -> JSONResponse:
+    # check if id exists in the registry metadata db 
+    # if it does not, return 404
+    # check if artifact is a model
+    # if not, return 400 
+    # parse lineage graph from model metadata
+    # return lineage graph as json 
+    pass
+
+# get cost of artifact
+@router.get("/artifact/{artifact_type}/{id}/cost/")
+async def get_artifact_cost(artifact_type: str, id: str) -> JSONResponse:
+    if artifact_type not in ["model", "dataset", "code"]:
+        return Response(status_code=400)
+    # check if id exists in the registry metadata db
+    # if it does not, return 404
+    # parse cost from artifact metadata
+    # return cost as json
