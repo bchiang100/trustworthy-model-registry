@@ -1,4 +1,5 @@
 """Tests for the Reproducibility metric."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -90,7 +91,9 @@ def test_reproducibility_no_local_repo(reproducibility_metric):
 
 def test_reproducibility_no_code_found(tmp_path, reproducibility_metric):
     """Test that metric returns 0 when no code is found."""
-    context = _create_model_context(tmp_path, readme_text="# No code here", include_example_file=False)
+    context = _create_model_context(
+        tmp_path, readme_text="# No code here", include_example_file=False
+    )
 
     score = reproducibility_metric.compute(context)
     assert score == 0.0
@@ -232,7 +235,9 @@ def test_reproducibility_extract_from_example_file(tmp_path, reproducibility_met
 
     examples_dir = repo_path / "examples"
     examples_dir.mkdir()
-    (examples_dir / "demo.py").write_text('print("from example file")', encoding="utf-8")
+    (examples_dir / "demo.py").write_text(
+        'print("from example file")', encoding="utf-8"
+    )
 
     local_repo = LocalRepository(
         repo_id="test/model",
