@@ -1,4 +1,5 @@
 """Load and organize scoring targets from the user-supplied URL file."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,7 +24,13 @@ def parse_url_file(path: Path) -> list[ScoreTarget]:
             code_buffer.append(line)
             continue
         if is_model_url(line):
-            targets.append(ScoreTarget(model_url=line, dataset_urls=list(dataset_buffer), code_urls=list(code_buffer)))
+            targets.append(
+                ScoreTarget(
+                    model_url=line,
+                    dataset_urls=list(dataset_buffer),
+                    code_urls=list(code_buffer),
+                )
+            )
             dataset_buffer.clear()
             code_buffer.clear()
             continue

@@ -1,4 +1,5 @@
 """Typed data structures used across the ACME CLI implementation."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -102,5 +103,3 @@ class EvaluationOutcome:
 
     metrics: dict[str, MetricResult]
     failures: list[MetricFailure]
-
-
