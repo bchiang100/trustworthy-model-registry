@@ -1,4 +1,5 @@
 """Reproducibility metric for evaluating if example code exists and runs successfully."""
+
 from __future__ import annotations
 
 import logging
@@ -71,7 +72,9 @@ class Reproducibility(Metric):
                 # First attempt: run without LLM debugging
                 output = self._execute_code(code)
                 if self._is_valid_output(output):
-                    logger.info("Example code executed successfully without LLM debugging")
+                    logger.info(
+                        "Example code executed successfully without LLM debugging"
+                    )
                     return 1.0
             except Exception as e:
                 logger.debug(f"Initial code execution failed: {e}")
@@ -83,7 +86,9 @@ class Reproducibility(Metric):
                     debugged_code = self._debug_code_with_llm(code, str(e))
                     output = self._execute_code(debugged_code)
                     if self._is_valid_output(output):
-                        logger.info("Example code executed successfully after LLM debugging")
+                        logger.info(
+                            "Example code executed successfully after LLM debugging"
+                        )
                         return 0.5
                 except Exception as debug_e:
                     logger.debug(f"LLM debugging failed: {debug_e}")
