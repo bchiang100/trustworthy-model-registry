@@ -1,14 +1,106 @@
 # manages model endpoints for CR[U]D operations
 
 import re
+import os
+import tempfile
 from typing import List, Optional
 
+# uses core scoring logic from ./run
+from acme_cli.scoring_engine import ModelScorer
+from acme_cli.context import ContextBuilder
+from acme_cli.net_score import compute_net_score
+from acme_cli.types import ScoreTarget
+
+import boto3
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, JSONResponse, Response, Request, RequestValidationError
 from pydantic import BaseModel
 from acme_cli.urls import parse_artifact_url, is_code_url, is_dataset_url, is_model_url
+from acme_cli.hf.client import HfApiClient
 from route_util import validate_url_string, make_id
 
 router = APIRouter()
+
+# S3 config
+S3_BUCKET_NAME = os.getenv("ACME_S3_BUCKET", "acme-model-registry")
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+
+# initialize the S3 client
+s3_client = boto3.client('s3', region_name=AWS_REGION)
+hf_client = HfApiClient()
+
+def upload_to_s3(local_file_path: str, s3_key: str) -> str:
+    """Upload file to S3 and return download URL."""
+    try:
+        s3_client.upload_file(local_file_path, S3_BUCKET_NAME, s3_key)
+        # generates download URL
+        download_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET_NAME, 'Key': s3_key},
+            ExpiresIn=3600
+        )
+        return download_url
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"S3 upload failed: {str(e)}")
+
+def download_artifact_from_hf(url: str, artifact_id: str) -> str:
+    """Download artifact from Hugging Face and return local path."""
+    try:
+        parsed_url = parse_artifact_url(url)
+        if not parsed_url:
+            raise ValueError(f"Invalid artifact URL: {url}")
+
+        # Create temporary directory for download
+        temp_dir = tempfile.mkdtemp()
+        local_path = os.path.join(temp_dir, f"{artifact_id}.tar.gz")
+
+        # Download based on artifact type
+        if is_model_url(url):
+            # Download model repository
+            repo_path = hf_client.snapshot_download(parsed_url.repo_id, cache_dir=temp_dir)
+            # Create archive of the downloaded content
+            import shutil
+            shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
+        elif is_dataset_url(url):
+            # Download dataset
+            repo_path = hf_client.snapshot_download(parsed_url.repo_id, repo_type="dataset", cache_dir=temp_dir)
+            import shutil
+            shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
+        else:
+            raise ValueError(f"Unsupported artifact type for URL: {url}")
+
+        return local_path
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
+    
+def calculate_metrics(artifact_url: str) -> dict:
+    """
+    Calculate and return all metric scores for an artifact
+    """
+    try:
+        target = ScoreTarget(model_url=artifact_url)
+        context_builder = ContextBuilder()
+        scorer = ModelScorer(context_builder=context_builder)
+
+        summary = scorer.score(target)
+        outcome = summary.outcome
+
+        net_metric = compute_net_score(outcome)
+        outcome.metrics[net_metric.name] = net_metric
+
+        metrics: dict[str, float | dict] = {}
+
+        for name, metric in outcome.metrics.items():
+            value = metric.value
+            if isinstance(value, dict):
+                metrics[name] = dict(value)
+            else:
+                metrics[name] = float(value)
+
+        return metrics
+
+    except Exception:
+        return {}
+
 
 # invalid requests for our spec use status code 400
 @router.exception_handler(RequestValidationError)
@@ -124,31 +216,79 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
 
-    # ensure that the url itself is valid 
+    # ensure that the url itself is valid
     artifact_url = request.url
     artifact_name = request.name
     if not validate_url_string(artifact_url):
-        # invalid url type 
-        return Response(status_code = 400)
+        # invalid url type
+        return Response(status_code=400)
+
     # check if url exists in the registry metadata db
-    # if it does, return 409
-    # download files using HF API 
+    if artifact_url in [meta.get("url") for meta in artifacts_metadata.values()]:
+        # URL already exists, return 409 (Conflict)
+        return Response(status_code=409)
+
+    # download files using HF API - done
+    # retrieves all metric values and store to memory
+    metrics = calculate_metrics(artifact_url)
+
     # rate artifact
-    rating = 0.5 # edit to use rating system 
-    # if pass, ingest and return 201 with artifact metadata and urls as json
-    # create id 
+    rating = metrics.get("net_score", 0.0)
+
+    # create id
     id = make_id(artifact_url)
-    if rating >= 0.5: 
-        # extract name
-        # place metadata in dict
-        # -> name, type, id, url, download url
-        # download files to s3 and create downloadable link
 
-        # TODO: include the S3 download url
-        artifacts_metadata[id] = {"name": artifact_name, "type": artifact_type, "url" : artifact_url} 
+    # if no id generated, return 0
+    if not id:
+        return 0
 
-    # if fail, return 424
-    pass
+    if rating >= 0.5: # trustworthy
+        try:
+            # download artifact from huggingface
+            local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
+
+            # creates S3 key for the artifact
+            s3_key = f"{artifact_type}/{id}/{artifact_name}.tar.gz"
+
+            # upload to S3 and get download URL
+            download_url = upload_to_s3(local_file_path, s3_key)
+
+            # Clean up local file
+            import os
+            os.remove(local_file_path)
+            os.rmdir(os.path.dirname(local_file_path))
+
+
+            # store metadata in memory
+            artifacts_metadata[id] = {
+                "name": artifact_name,
+                "type": artifact_type,
+                "url": artifact_url,
+                "download_url": download_url,
+                "s3_key": s3_key
+            }
+
+            return JSONResponse(
+                content={
+                    "metadata": {
+                        "name": artifact_name,
+                        "id": id,
+                        "type": artifact_type
+                    },
+                    "data": {
+                        "url": artifact_url,
+                        "download_url": download_url
+                    }
+                },
+                status_code=201
+            )
+        
+        except Exception as e:
+            # If S3 upload fails, return 500
+            raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+    else:
+        # if rating fails, return 424
+        return Response(status_code=424)
 
 # Get track
 @router.get("/tracks/")
