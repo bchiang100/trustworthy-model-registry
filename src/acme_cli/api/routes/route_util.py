@@ -1,9 +1,17 @@
+import base64
 from urllib.parse import urlparse, urlunparse 
 import hashlib
-import re 
+import re
+
+import requests 
 
 # regex used to detect urls 
+# information to analyze public github repos for license check
 URL_REGEX = re.compile(r"https?://[^\s]+")
+GITHUB_API = "https://api.github.com"
+HEADERS = {
+    "Accept": "application/vnd.github+json"
+}
 
 # detects if a string is a single url of valid format and http(s)
 def validate_url_string(url: str) -> bool:
@@ -49,3 +57,77 @@ def make_id(url: str) -> str:
     return f"{id_num:010d}"
     
 
+# ensures validity of github url
+def parse_github_repo_url(url: str) -> tuple[bool, str, str]:
+    parsed = urlparse(url.strip())
+
+    if parsed.scheme not in {"http", "https"}:
+        return False, '', ''
+
+    if parsed.netloc != "github.com":
+        return False, '', ''
+
+    parts = parsed.path.strip("/").split("/")
+    if len(parts) != 2:
+        return False, '', ''
+
+    owner, repo = parts
+    return True, owner, repo
+
+# checks that repo is public and exists
+def is_valid_repo(owner: str, repo: str) -> bool:
+    r = requests.get(
+        f"{GITHUB_API}/repos/{owner}/{repo}",
+        headers=HEADERS,
+        timeout=10,
+    )
+
+    if r.status_code == 404:
+        return False
+
+    if r.status_code != 200:
+        return False
+
+    data = r.json()
+
+    if data.get("private"):
+        return False
+
+    return True 
+
+# fetches readme from repo
+def fetch_readme(owner: str, repo: str) -> tuple[bool, str]:
+    r = requests.get(
+        f"{GITHUB_API}/repos/{owner}/{repo}/readme",
+        headers=HEADERS,
+        timeout=10,
+    )
+
+    if r.status_code == 404:
+        return False, ''
+
+    if r.status_code != 200:
+        return False, ''
+
+    data = r.json()
+
+    if data.get("encoding") != "base64":
+        return False, ''
+
+    content = base64.b64decode(data["content"]).decode("utf-8", errors="replace")
+    return True, content
+
+def get_github_readme(repo_url: str) -> tuple[bool, str]:
+    good_url, owner, repo = parse_github_repo_url(repo_url)
+    if not good_url:
+        return False, ''
+
+    good_repo = is_valid_repo(owner, repo)  # validates repo existence and visibility
+    if not good_repo:
+        return False, ''
+
+    good_readme, readme = fetch_readme(owner, repo)
+    if not good_readme:
+        return False, ''
+
+    return True, readme 
