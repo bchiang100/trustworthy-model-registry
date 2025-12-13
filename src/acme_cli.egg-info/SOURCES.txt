@@ -18,6 +18,8 @@ src/acme_cli.egg-info/requires.txt
 src/acme_cli.egg-info/top_level.txt
 src/acme_cli/api/__init__.py
 src/acme_cli/api/main.py
+src/acme_cli/api/middleware.py
+src/acme_cli/api/monitoring.py
 src/acme_cli/api/server.py
 src/acme_cli/api/routes/__init__.py
 src/acme_cli/api/routes/health.py
