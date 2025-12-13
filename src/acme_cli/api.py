@@ -16,6 +16,7 @@ To run locally for development:
     uvicorn acme_cli.api:app --reload --port 8080
 
 """
+
 from __future__ import annotations
 
 import os
@@ -39,9 +40,17 @@ app = FastAPI(title="Trustworthy Model Registry API", version="0.1")
 # Shared components (created once per process)
 _hf_lineage_extractor = LineageExtractor()
 _cache_dir = os.getenv("ACME_SCORE_CACHE_DIR")
-_score_registry = FileSystemScoreRegistry(cache_dir=_cache_dir) if _cache_dir else FileSystemScoreRegistry()
+_score_registry = (
+    FileSystemScoreRegistry(cache_dir=_cache_dir)
+    if _cache_dir
+    else FileSystemScoreRegistry()
+)
 _default_score_fn = make_score_fn(registry=_score_registry)
-_tree_metric = TreeScoreMetric(lineage_extractor=_hf_lineage_extractor, score_registry=_score_registry, score_fn=_default_score_fn)
+_tree_metric = TreeScoreMetric(
+    lineage_extractor=_hf_lineage_extractor,
+    score_registry=_score_registry,
+    score_fn=_default_score_fn,
+)
 _context_builder = ContextBuilder()
 
 
@@ -85,13 +94,17 @@ def _build_context_for_repo(repo_id: str) -> ModelContext:
 
 # --- Endpoints ------------------------------------------------------
 @app.get("/lineage/{repo_id}", response_model=LineageResponse)
-def get_lineage(repo_id: str, max_depth: int = Query(5, ge=0, le=20)) -> LineageResponse:
+def get_lineage(
+    repo_id: str, max_depth: int = Query(5, ge=0, le=20)
+) -> LineageResponse:
     """Return the lineage graph for the given model repo_id.
 
     repo_id should be in the form 'org/model'.
     """
     try:
-        graph: LineageGraph = _hf_lineage_extractor.extract(repo_id, max_depth=max_depth)
+        graph: LineageGraph = _hf_lineage_extractor.extract(
+            repo_id, max_depth=max_depth
+        )
 
         nodes_out: Dict[str, LineageNodeOut] = {}
         for rid, node in graph.nodes.items():
@@ -103,15 +116,21 @@ def get_lineage(repo_id: str, max_depth: int = Query(5, ge=0, le=20)) -> Lineage
             )
 
         ancestors = graph.get_ancestors()
-        return LineageResponse(root=graph.root_repo_id, nodes=nodes_out, ancestors=ancestors)
+        return LineageResponse(
+            root=graph.root_repo_id, nodes=nodes_out, ancestors=ancestors
+        )
 
     except Exception as exc:  # noqa: BLE001 - return 404 for errors retrieving metadata
         logger.exception("Failed to build lineage for %s: %s", repo_id, exc)
-        raise HTTPException(status_code=404, detail=f"Could not build lineage for {repo_id}: {exc}")
+        raise HTTPException(
+            status_code=404, detail=f"Could not build lineage for {repo_id}: {exc}"
+        )
 
 
 @app.get("/tree_score/{repo_id}", response_model=TreeScoreResponse)
-def get_tree_score(repo_id: str, max_depth: int = Query(5, ge=0, le=20), recompute: bool = Query(False)) -> TreeScoreResponse:
+def get_tree_score(
+    repo_id: str, max_depth: int = Query(5, ge=0, le=20), recompute: bool = Query(False)
+) -> TreeScoreResponse:
     """Compute and return the tree score for the specified model.
 
     Parameters:
@@ -127,7 +146,9 @@ def get_tree_score(repo_id: str, max_depth: int = Query(5, ge=0, le=20), recompu
             for aid in ancestors:
                 try:
                     # FileSystemScoreRegistry exposes clear/remove via filesystem; try to delete
-                    path = _score_registry._get_cache_path(aid)  # use protected API for convenience
+                    path = _score_registry._get_cache_path(
+                        aid
+                    )  # use protected API for convenience
                     if path.exists():
                         path.unlink()
                 except Exception:
@@ -147,17 +168,26 @@ def get_tree_score(repo_id: str, max_depth: int = Query(5, ge=0, le=20), recompu
                 if _score_registry.has_score(aid):
                     scores = _score_registry.get_score(aid)
                     # average numeric values (same logic as scores helper)
-                    avg = _tree_metric._average_scores(scores.values()) if scores else 0.5
+                    avg = (
+                        _tree_metric._average_scores(scores.values()) if scores else 0.5
+                    )
                     ancestor_scores[aid] = avg
                 else:
                     # compute on-demand via default score_fn
                     val = _default_score_fn(aid)
                     ancestor_scores[aid] = val
             except Exception as e:  # noqa: BLE001
-                logger.warning("Failed to get/compute score for ancestor %s: %s", aid, e)
+                logger.warning(
+                    "Failed to get/compute score for ancestor %s: %s", aid, e
+                )
                 ancestor_scores[aid] = 0.5
 
-        return TreeScoreResponse(repo_id=repo_id, tree_score=tree_score_value, ancestors=ancestors, ancestor_scores=ancestor_scores)
+        return TreeScoreResponse(
+            repo_id=repo_id,
+            tree_score=tree_score_value,
+            ancestors=ancestors,
+            ancestor_scores=ancestor_scores,
+        )
 
     except Exception as exc:  # noqa: BLE001
         logger.exception("Error computing tree score for %s: %s", repo_id, exc)

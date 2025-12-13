@@ -118,7 +118,9 @@ def example_2_score_registry():
     base_scores = {
         "model_size": MetricResult(name="model_size", value=0.8, latency_ms=50),
         "performance": MetricResult(name="performance", value=0.9, latency_ms=100),
-        "reproducibility": MetricResult(name="reproducibility", value=0.85, latency_ms=200),
+        "reproducibility": MetricResult(
+            name="reproducibility", value=0.85, latency_ms=200
+        ),
     }
 
     print("\nSaving scores for base models...")
@@ -128,7 +130,9 @@ def example_2_score_registry():
         {
             "model_size": MetricResult(name="model_size", value=0.75, latency_ms=50),
             "performance": MetricResult(name="performance", value=0.88, latency_ms=100),
-            "reproducibility": MetricResult(name="reproducibility", value=0.80, latency_ms=200),
+            "reproducibility": MetricResult(
+                name="reproducibility", value=0.80, latency_ms=200
+            ),
         },
     )
 
@@ -162,7 +166,9 @@ def example_3_tree_score_with_registry():
             registry.save_score(
                 repo_id,
                 {
-                    "combined": MetricResult(name="combined", value=score, latency_ms=100)
+                    "combined": MetricResult(
+                        name="combined", value=score, latency_ms=100
+                    )
                 },
             )
 
@@ -178,9 +184,12 @@ def example_3_tree_score_with_registry():
 
         # Manually set up the lineage graph for demo purposes
         from unittest.mock import MagicMock
+
         mock_graph = LineageGraph(root_repo_id="acme/fine-tuned-bert")
         mock_graph.add_node("acme/fine-tuned-bert", parents=["acme/base-bert"], depth=0)
-        mock_graph.add_node("acme/base-bert", parents=["google/bert-base-uncased"], depth=1)
+        mock_graph.add_node(
+            "acme/base-bert", parents=["google/bert-base-uncased"], depth=1
+        )
         mock_graph.add_node("google/bert-base-uncased", parents=[], depth=2)
 
         # Mock the extractor
@@ -231,11 +240,14 @@ def example_4_tree_score_with_function():
         # Manually set up the lineage graph
         mock_graph = LineageGraph(root_repo_id="acme/fine-tuned-bert")
         mock_graph.add_node("acme/fine-tuned-bert", parents=["acme/base-bert"], depth=0)
-        mock_graph.add_node("acme/base-bert", parents=["google/bert-base-uncased"], depth=1)
+        mock_graph.add_node(
+            "acme/base-bert", parents=["google/bert-base-uncased"], depth=1
+        )
         mock_graph.add_node("google/bert-base-uncased", parents=[], depth=2)
 
         # Mock the extractor
         from unittest.mock import MagicMock
+
         metric._extractor.extract = MagicMock(return_value=mock_graph)
 
         print("\nModel: acme/fine-tuned-bert")

@@ -5,12 +5,17 @@ check a `ScoreRegistry` for cached metric results, and if missing will run
 the standard scoring pipeline (via ModelScorer), persist the results, and
 return an averaged numeric score in [0, 1].
 """
+
 from __future__ import annotations
 
 import logging
 from typing import Callable, Mapping
 
-from acme_cli.score_registry import FileSystemScoreRegistry, InMemoryScoreRegistry, ScoreRegistry
+from acme_cli.score_registry import (
+    FileSystemScoreRegistry,
+    InMemoryScoreRegistry,
+    ScoreRegistry,
+)
 from acme_cli.scoring_engine import ModelScorer
 from acme_cli.types import MetricResult, ScoreTarget
 

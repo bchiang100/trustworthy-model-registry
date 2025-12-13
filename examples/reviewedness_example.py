@@ -136,9 +136,7 @@ def example_3_partial_code_reviewed():
     print("Example 3: Partial Code Review Coverage")
     print("=" * 70)
 
-    context = create_model_context(
-        code_urls=["https://github.com/pytorch/pytorch"]
-    )
+    context = create_model_context(code_urls=["https://github.com/pytorch/pytorch"])
 
     # Mock the GitHub client
     mock_client = MagicMock(spec=GitHubClient)
@@ -249,9 +247,7 @@ def example_5_no_prs():
     print("Example 5: Repository with No Pull Requests")
     print("=" * 70)
 
-    context = create_model_context(
-        code_urls=["https://github.com/example/repository"]
-    )
+    context = create_model_context(code_urls=["https://github.com/example/repository"])
 
     # Mock the GitHub client
     mock_client = MagicMock(spec=GitHubClient)

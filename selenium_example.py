@@ -94,7 +94,7 @@ def test_all_pages():
         ("Upload", "upload.html"),
         ("Ingest", "ingest.html"),
         ("License Check", "license_check.html"),
-        ("Enumerate", "enumerate.html")
+        ("Enumerate", "enumerate.html"),
     ]
 
     driver = webdriver.Chrome()

@@ -1,4 +1,5 @@
 """Tests for the Reviewedness metric."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -79,9 +80,12 @@ class TestGitHubClient:
             {"number": 1, "merged_at": "2023-01-01T00:00:00Z", "review_comments": 2},
             {"number": 2, "merged_at": None, "review_comments": 0},  # Not merged
         ]
-        
+
         mock_response = MagicMock()
-        mock_response.json.side_effect = [prs_data, []]  # First page has data, second is empty
+        mock_response.json.side_effect = [
+            prs_data,
+            [],
+        ]  # First page has data, second is empty
         mock_session.get.return_value = mock_response
 
         client = GitHubClient()
@@ -101,7 +105,7 @@ class TestGitHubClient:
             {"sha": "abc123", "commit": {"message": "fix: bug"}},
             {"sha": "def456", "commit": {"message": "feat: feature"}},
         ]
-        
+
         mock_response = MagicMock()
         mock_response.json.side_effect = [commits_data, []]  # First page, then empty
         mock_session.get.return_value = mock_response
@@ -226,9 +230,7 @@ class TestReviewednessMetric:
         ]
 
         # Each PR has 5 commits
-        mock_commits.return_value = [
-            {"sha": f"commit{i}"} for i in range(5)
-        ]
+        mock_commits.return_value = [{"sha": f"commit{i}"} for i in range(5)]
 
         metric = ReviewednessMetric()
         score = metric._compute_repo_score("owner", "repo")

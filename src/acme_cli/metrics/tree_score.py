@@ -1,4 +1,5 @@
 """Tree score metric based on model lineage and ancestor model scores."""
+
 from __future__ import annotations
 
 import logging
@@ -17,11 +18,11 @@ logger = logging.getLogger(__name__)
 class TreeScoreMetric(Metric):
     """
     Metric that computes a score based on model lineage and parent model scores.
-    
+
     The tree score is calculated as the average of all ancestor model scores.
     For models without cached scores, the scores are computed on-demand using
     a provided scoring function.
-    
+
     Tree Score = Average of all parent model scores (or 1.0 if no parents)
     """
 
@@ -36,7 +37,7 @@ class TreeScoreMetric(Metric):
         max_lineage_depth: int = 10,
     ) -> None:
         """Initialize the tree score metric.
-        
+
         Args:
             lineage_extractor: Extractor for building model lineage graphs
             score_registry: Registry for caching and retrieving scores
@@ -55,10 +56,10 @@ class TreeScoreMetric(Metric):
     def compute(self, context: ModelContext) -> float:
         """
         Compute the tree score for a model.
-        
+
         Args:
             context: The model context containing model metadata
-            
+
         Returns:
             float: Tree score between 0 and 1
         """
@@ -85,7 +86,9 @@ class TreeScoreMetric(Metric):
 
             if not ancestor_scores:
                 # Could not compute any ancestor scores
-                logger.warning(f"Could not compute scores for any ancestors of {repo_id}")
+                logger.warning(
+                    f"Could not compute scores for any ancestors of {repo_id}"
+                )
                 return 0.5  # Conservative score
 
             # Return average of ancestor scores
@@ -98,13 +101,13 @@ class TreeScoreMetric(Metric):
 
     def _get_ancestor_scores(self, ancestor_ids: list[str]) -> list[float]:
         """Get scores for all ancestor models.
-        
+
         For each ancestor, first checks the registry for cached scores.
         If not found and score_fn is available, computes the score on-demand.
-        
+
         Args:
             ancestor_ids: List of ancestor model repository IDs
-            
+
         Returns:
             List of averaged scores for ancestors
         """
@@ -122,12 +125,12 @@ class TreeScoreMetric(Metric):
 
     def _get_single_ancestor_score(self, repo_id: str) -> Optional[float]:
         """Get the average score for a single ancestor model.
-        
+
         Checks registry first, then uses score_fn if available.
-        
+
         Args:
             repo_id: The ancestor model repository ID
-            
+
         Returns:
             Average of all metric scores, or None if unable to compute
         """
@@ -150,10 +153,10 @@ class TreeScoreMetric(Metric):
     @staticmethod
     def _average_scores(scores) -> float:
         """Calculate average of multiple metric scores.
-        
+
         Args:
             scores: Iterable of MetricResult objects
-            
+
         Returns:
             Average score between 0 and 1
         """
@@ -164,7 +167,9 @@ class TreeScoreMetric(Metric):
                 value = score_result.value
                 if isinstance(value, dict):
                     # For composite scores, take the average of values
-                    numeric_scores.extend(v for v in value.values() if isinstance(v, (int, float)))
+                    numeric_scores.extend(
+                        v for v in value.values() if isinstance(v, (int, float))
+                    )
                 elif isinstance(value, (int, float)):
                     numeric_scores.append(value)
             except Exception:

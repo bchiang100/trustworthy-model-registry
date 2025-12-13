@@ -1,4 +1,5 @@
 """Tests for lineage graph and tree score metric."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -25,7 +26,9 @@ class TestLineageNode:
 
     def test_creation(self):
         """Test LineageNode creation."""
-        node = LineageNode(repo_id="org/model", parent_ids=["org/parent1", "org/parent2"])
+        node = LineageNode(
+            repo_id="org/model", parent_ids=["org/parent1", "org/parent2"]
+        )
         assert node.repo_id == "org/model"
         assert len(node.parent_ids) == 2
 
@@ -121,7 +124,9 @@ class TestLineageExtractor:
                 library_name=None,
             )
 
-            with patch.object(extractor, "_extract_parents_from_config") as mock_parents:
+            with patch.object(
+                extractor, "_extract_parents_from_config"
+            ) as mock_parents:
                 mock_parents.return_value = []
 
                 graph = extractor.extract("org/model")
@@ -148,8 +153,12 @@ class TestLineageExtractor:
                 library_name=None,
             )
 
-        with patch.object(extractor._hf_client, "get_model", side_effect=mock_get_model):
-            with patch.object(extractor, "_extract_parents_from_config") as mock_parents:
+        with patch.object(
+            extractor._hf_client, "get_model", side_effect=mock_get_model
+        ):
+            with patch.object(
+                extractor, "_extract_parents_from_config"
+            ) as mock_parents:
 
                 def parents_side_effect(repo_id):
                     if repo_id == "org/model":

@@ -20,7 +20,11 @@ from acme_cli.metrics.size import SizeMetric
 from acme_cli.types import EvaluationOutcome, MetricFailure, MetricResult, ModelContext
 
 
-def build_metrics(llm: LlmEvaluator | None = None, include_tree_score: bool = False, score_fn: Optional[Callable[[str], float]] = None) -> list[Metric]:
+def build_metrics(
+    llm: LlmEvaluator | None = None,
+    include_tree_score: bool = False,
+    score_fn: Optional[Callable[[str], float]] = None,
+) -> list[Metric]:
     shared_llm = llm or LlmEvaluator()
     metrics = [
         RampUpMetric(shared_llm),
@@ -33,10 +37,11 @@ def build_metrics(llm: LlmEvaluator | None = None, include_tree_score: bool = Fa
         CodeQualityMetric(),
         ReviewednessMetric(),
     ]
-    
+
     # Optionally include tree score metric
     if include_tree_score:
         from acme_cli.metrics.tree_score import TreeScoreMetric
+
         # If no score_fn provided, create a default one that computes and caches
         # scores using the filesystem-backed registry and ModelScorer.
         if score_fn is None:
@@ -47,7 +52,7 @@ def build_metrics(llm: LlmEvaluator | None = None, include_tree_score: bool = Fa
             score_fn = make_score_fn(registry=registry)
 
         metrics.append(TreeScoreMetric(score_fn=score_fn))
-    
+
     return metrics
 
 
