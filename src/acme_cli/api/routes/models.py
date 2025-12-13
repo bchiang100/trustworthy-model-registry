@@ -1,12 +1,18 @@
 # manages model endpoints for CR[U]D operations
 
+import re
 from typing import List, Optional
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, JSONResponse, Response 
 from pydantic import BaseModel
 
 router = APIRouter()
 
+class RegexSearch(BaseModel):
+    regex: str
+
+class LicenseCheckRequest(BaseModel):
+    github_url: str
 
 class ModelMetadata(BaseModel):
     name: str
@@ -221,3 +227,35 @@ async def ingest_huggingface_model(
         "status": "validating",
         "estimated_completion_time": "10 minutes",
     }
+
+# Get track
+@router.get("/tracks/")
+async def get_tracks():
+    return JSONResponse(content={"plannedTracks": "Performance track"}, status_code=200)
+
+# health check
+@router.get("/health/")
+async def get_health():
+    # TODO: some ping to the system to ensure it is reachable? if we want to do this 
+    return Response(status_code = 200)
+
+@router.post("/artifacts/")
+async def get_artifacts(offset: str = "0"):
+    try:
+        pagination_offset: int = int(offset)
+        # TODO: some math and query parsing to return artifacts based on type + offset
+    except:
+        return Response(status_code=403)
+
+@router.post("/artifact/byRegEx/")
+async def get_artifacts(regex: RegexSearch):
+    # TODO: some logic for regex to check validity of expression
+    # also validate the request body itself
+    pattern = re.compile(regex="regex")
+    return Response(status_code=403)
+
+
+@router.delete("/reset/")
+async def reset_registry():
+    # TODO: implement logic to batch enumerate from s3 and delete
+    return Response(status_code=200)
