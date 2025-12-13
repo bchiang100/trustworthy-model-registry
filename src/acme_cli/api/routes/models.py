@@ -3,6 +3,7 @@
 import re
 import os
 import tempfile
+import time
 from typing import List, Optional
 
 # uses core scoring logic from ./run
@@ -16,7 +17,7 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile, JSONRespo
 from pydantic import BaseModel
 from acme_cli.urls import parse_artifact_url, is_code_url, is_dataset_url, is_model_url
 from acme_cli.hf.client import HfApiClient
-from route_util import validate_url_string, make_id
+from route_util import get_github_readme, validate_url_string, make_id
 
 router = APIRouter()
 
@@ -201,14 +202,30 @@ async def get_artifact(artifact_type: str, id: str):
 # update specific artifact
 @router.put("/artifact/{artifact_type}/{id}/")
 async def update_artifact(artifact_type: str, id: str, request: UpdateArtifactRequest):
+    artifact_metadata = request.metadata
+    artifact_data = request.data 
+
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
     # check if name and id exists in the registry metadata db 
+    if artifact_metadata.id not in artifacts_metadata: 
+        return Response(status_code=404)
     # if it does not, return 404
-    # parse artifact metadata from db 
-    # update artifact metadata in db 
-    # re-ingest with new link
-    pass
+    new_url = artifact_data.url
+
+    # rate new url, ignore update if new url doesn't pass ratings 
+    rating = 0.5 
+    if rating < 0.5: 
+        return Response(status_code=404)
+
+    # if passes, update metadata and s3 using provided name and url
+    artifacts_metadata[id]["name"] = artifact_metadata.name
+    artifacts_metadata[id]["url"] = new_url
+    # push files to s3 
+    # get downloadable link from s3 
+    download_link = "temp"
+    artifacts_metadata[id]["download_url"] = download_link
+    return Response(status_code=200)
 
 # ingest artifact
 @router.put("/artifact/{artifact_type}/")
@@ -297,29 +314,54 @@ async def get_tracks():
 
 # Regex search
 @router.post("/artifact/byRegEx/")
-async def get_artifacts(regex: RegexSearch):
-    # TODO: some logic for regex to check validity of expression
-    # also validate the request body itself
-    pattern = re.compile(regex="regex")
-    return Response(status_code=403)
+async def get_artifacts(request: RegexSearch):
+    # grab regex from request, start timer, and store matches in a list 
+    regex = request.regex
+    pattern = re.compile(regex)
+
+    start_time = time.monotonic()
+    matching_artifacts = []
+
+    # search through artifact metadata to determine if there are any matches
+    for artifact_id in artifacts_metadata(): 
+        name = artifacts_metadata[artifact_id]["name"]
+        if pattern.search(name): # artifact name matches regex
+            type = artifacts_metadata[artifact_id]["type"]
+            artifact_dict = {"name" : name, "id" : artifact_id, "type": type}
+            matching_artifacts.append(artifact_dict) 
+
+        if time.monotonic - start_time > 5: # regex is bad or causing too much backtracking
+            Response(status_code=400)
+
+    # zero regex matches
+    if len(matching_artifacts) == 0:
+        return Response(status_code=404)
+    else: # nonzero regex matches
+        return JSONResponse(content=matching_artifacts, status_code=200)
 
 # license check of model against github project 
 @router.post("/artifact/model/{id}/license-check/")
-async def check_license(id: str, project_url: LicenseCheckRequest) -> JSONResponse:
-    # check if id exists in the registry metadata db 
-    # if it does not, return 404
-    # check if artifact is a model
-    # if not, return 400 
-    # parse license from model metadata
-    # parse the project url to check if it is a valid github url
-    project = project_url.github_url
-    # if it is not, return 404 
-    # if it does, check the license against project url 
+async def check_license(id: str, request: LicenseCheckRequest) -> JSONResponse:
+    # checks if artifact is not in registry
+    project_url = request.github_url
+    if id not in artifacts_metadata: 
+        return Response(status_code=404)
+
+    # checks if artifact is a model
+    if artifacts_metadata[id]["type"] != "model":
+        return Response(status_code=400)
+    # parse license from model 
+
+    # parse the project url for readme
+    valid, readme = get_github_readme(project_url)
+    if not valid:
+        return Response(status_code=404)
     # if no license, return 502
+    # use llm to determine whether the project can use the model for fine tuning and inference
     # return status as true or false in json 
     pass
 
-# get lineage graph of model
+# get lineage graph of model, refer to evan's metric generation for that 
 @router.post("/artifact/model/{id}/lineage/")
 async def get_lineage_graph(id: str) -> JSONResponse:
     # check if id exists in the registry metadata db 
