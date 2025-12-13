@@ -3,26 +3,24 @@
 */.DS_Store
 **/.DS_Store
 model_process.log
-
-# Python build artifacts
-dist/
-build/
-*.egg-info/
-
-# Test coverage
-coverage.xml
-htmlcov/
-
-# Python cache
-__pycache__/
+__pycache__
 *.pyc
 *.pyo
+*.pyd
+*.so
 
-# Virtual environments
-venv/
-env/
-.env
+# Ignore Python virtual environment
+.venv
 
-# IDE files
-.vscode/
-.idea/
+# Ignore Python build files
+build
+dist
+*.egg-info
+
+# Ignore Python test files
+.pytest_cache
+.coverage
+htmlcov
+
+# Ignore Python virtual environment
+venv
