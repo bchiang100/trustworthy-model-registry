@@ -19,39 +19,14 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from acme_cli.urls import parse_artifact_url, is_code_url, is_dataset_url, is_model_url
 from acme_cli.hf.client import HfClient
+from route_util import validate_url_string, get_github_readme, make_id
 import hashlib
 
 
-def validate_url_string(url: str) -> bool:
-    """Minimal URL validation used by the router.
-
-    This intentionally keeps dependencies light for tests: it only checks for
-    an http/https scheme.
-    """
-    return bool(re.match(r"^https?://", (url or "")))
-
-
-def make_id(url: str) -> str:
-    """Create a short deterministic id for an artifact URL.
-
-    Uses a truncated sha1 hex digest to avoid filesystem/unicode issues.
-    """
-    digest = hashlib.sha1(url.encode("utf-8")).hexdigest()
-    return digest[:16]
-
-
-def get_github_readme(project_url: str) -> tuple[bool, str | None]:
-    """Lightweight helper that says whether the repo looks like GitHub.
-
-    Returns (valid, readme_text). We don't attempt network calls here so tests
-    remain deterministic and fast.
-    """
-    if not project_url or "github.com" not in project_url:
-        return (False, None)
-    return (True, "")
 from acme_cli.lineage_graph import LineageExtractor
 
 router = APIRouter()
+
 
 # S3 config
 S3_BUCKET_NAME = os.getenv("ACME_S3_BUCKET", "acme-model-registry")
@@ -60,6 +35,9 @@ AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 # initialize the S3 client
 s3_client = boto3.client('s3', region_name=AWS_REGION)
 hf_client = HfClient()
+
+# other constants
+PAGINATION_SIZE = 10
 
 def upload_to_s3(local_file_path: str, s3_key: str) -> str:
     """Upload file to S3 and return download URL."""
@@ -153,9 +131,13 @@ else:
     ):
         return Response(status_code=400)
 
-# python dict to hold metdata of artifacts
+# python data structures to hold metdata of artifacts
 # id -> name, type, url, downloadable s3 url
 artifacts_metadata = {} 
+# order of ids 
+artifact_ids = []
+# name -> id 
+artifact_name_to_id: dict[str, List[int]] = {}
 
 class RegexSearch(BaseModel):
     regex: str
@@ -179,6 +161,10 @@ class LicenseCheckRequest(BaseModel):
 class UpdateArtifactRequest(BaseModel):
     metadata: ArtifactMetadata
     data: ArtifactData
+
+class QueryRequest(BaseModel):
+    name: str 
+    types: List[str]  # "model", "dataset", "code"
 
 class ModelMetadata(BaseModel):
     name: str
@@ -212,22 +198,41 @@ async def get_health():
 
 # query artifacts
 @router.post("/artifacts/")
-async def get_artifacts(offset: str = "0"):
-    try:
-        pagination_offset: int = int(offset)
-        # TODO: some math and query parsing to return artifacts based on type + offset
-        artifacts = {}
+async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
+    pagination_offset: int = int(offset)
+
+    # enumerate all artifacts in the registry metadata up to pagination size or end of registry
+    if len(request) == 0 and request[0].name == "":
+        for id in artifact_ids[pagination_offset:min(pagination_offset+PAGINATION_SIZE, len(artifacts_metadata))]:
+            name = artifacts_metadata[id]["name"]
+            type = artifacts_metadata[id]["type"]
+            artifacts.append({"name": name, "id": id, "type": type})
         headers = {offset: str(pagination_offset + len(artifacts))}
-        content = {}
-        return JSONResponse(content=content, headers=headers)
-    except:
-        return Response(status_code=403)
+        return JSONResponse(content=artifacts, headers=headers, status_code=200)
+
+    # parse each query request, search for matches by name and then validate type 
+    artifacts = [] 
+    for query in request:
+        name = query.name
+        types = query.types
+        for id in artifact_name_to_id.get(name, []):
+            artifact = artifacts_metadata[id]
+            if artifact["type"] in types: 
+                type = artifacts_metadata[id]["type"]
+                artifacts.append({"name": name, "id": id, "type": type})
+    headers = {offset: str(pagination_offset + len(artifacts))}
+
+    # too many artifacts returned
+    if len(artifacts) > PAGINATION_SIZE:
+        return Response(status_code=413)
+    # return artifact matches 
+    return JSONResponse(content=artifacts, headers=headers, status_code=200)
 
 # reset registry (remove all entries)
 @router.delete("/reset/")
 async def reset_registry():
     # TODO: implement logic to batch enumerate from s3 and delete
-    # TODO: also clear metadata db 
+    # TODO: also clear metadata dicts 
     return Response(status_code=200)
 
 # get specific artifact
@@ -236,10 +241,16 @@ async def get_artifact(artifact_type: str, id: str):
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
     # check if id exists in the registry metadata db 
+    if id not in artifacts_metadata: 
+        return Response(status_code=404)
     # if it does not, return 404
     # parse artifact metadata from db 
-    # return artifact metadata as json 
-    pass
+    name = artifacts_metadata[id]["name"]
+    url = artifacts_metadata[id]["url"]
+    metadata = {"name": name, "id": id, "type": artifact_type}
+    data = {"url": url}
+    artifact = {"metadata": metadata, "data": data}
+    return JSONResponse(content=artifact, status_code=200)
 
 # update specific artifact
 @router.put("/artifact/{artifact_type}/{id}/")
@@ -287,8 +298,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
         # URL already exists, return 409 (Conflict)
         return Response(status_code=409)
 
-    # download files using HF API - done
-    # retrieves all metric values and store to memory
+    # retrieves all metric values 
     metrics = calculate_metrics(artifact_url)
 
     # rate artifact
@@ -303,7 +313,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
             local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
 
             # creates S3 key for the artifact
-            s3_key = f"{artifact_type}/{id}/{artifact_name}.tar.gz"
+            s3_key = f"{artifact_type}/{id}/.tar.gz"
 
             # upload to S3 and get download URL
             download_url = upload_to_s3(local_file_path, s3_key)
@@ -322,7 +332,13 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
                 "download_url": download_url,
                 "s3_key": s3_key
             }
+            artifact_ids.append(id)
+            # for new ids, handles the case where multiple artifacts share the same name
+            if artifact_name not in artifact_name_to_id:
+                artifact_name_to_id[artifact_name] = []
+            artifact_name_to_id[artifact_name].append(id)
 
+            # return artifact metadata and data as json
             return JSONResponse(
                 content={
                     "metadata": {
@@ -348,6 +364,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
 # Get track
 @router.get("/tracks/")
 async def get_tracks():
+    # return track as json
     return JSONResponse(content={"plannedTracks": "Performance track"}, status_code=200)
 
 # Regex search
@@ -367,8 +384,9 @@ async def get_artifacts(request: RegexSearch):
             type = artifacts_metadata[artifact_id]["type"]
             artifact_dict = {"name" : name, "id" : artifact_id, "type": type}
             matching_artifacts.append(artifact_dict) 
+        # should also implement readme searching 
 
-        if time.monotonic - start_time > 5: # regex is bad or causing too much backtracking, search time is > 3 seconds
+        if time.monotonic() - start_time > 2: # regex is bad or causing too much backtracking, search time is > 2 seconds
             Response(status_code=400) # invalid regex
 
     # zero regex matches
@@ -395,9 +413,15 @@ async def check_license(id: str, request: LicenseCheckRequest) -> JSONResponse:
     if not valid:
         return Response(status_code=404)
     # if no license, return 502
+    project_has_license = readme.lower().find("license") != -1
+    if not project_has_license:
+        return Response(status_code=502)
     # use llm to determine whether the project can use the model for fine tuning and inference
+    license_compatible = True
+    if not license_compatible:
+        return JSONResponse(content="false", status_code=200)
     # return status as true or false in json 
-    pass
+    return JSONResponse(content="true", status_code=200)
 
 # get lineage graph of model, refer to evan's metric generation for that 
 @router.post("/artifact/model/{id}/lineage/")
@@ -549,4 +573,7 @@ async def get_artifact_cost(artifact_type: str, id: str, dependency: bool = Fals
         # find costs of dependencies 
         sub_costs = 1
     total_cost = standalone_cost + sub_costs
+
+    # if error in cost calculation, return 500
+    return Response(status_code=500) 
     # return cost as json
