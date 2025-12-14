@@ -32,7 +32,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from middleware import MetricsMiddleware
-from routes import health, models
+from routes import models, health
 
 app = FastAPI(
     title="ACME Trustworthy Model Registry",
