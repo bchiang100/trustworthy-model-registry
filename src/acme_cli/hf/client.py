@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable, Optional
 
-from huggingface_hub import HfApi
+from huggingface_hub import HfApi, snapshot_download
 from huggingface_hub.hf_api import DatasetInfo, ModelInfo, RepoFile
 
 from acme_cli.types import DatasetMetadata, ModelMetadata
@@ -138,6 +138,24 @@ class HfClient:
         except Exception:  # noqa: BLE001
             return []
         return list(files)
+
+    def snapshot_download(self, repo_id: str, repo_type: str = "model", cache_dir: Optional[str] = None) -> str | None:
+        """Download a snapshot of the repo and return the local path to it.
+
+        Wraps `huggingface_hub.snapshot_download` and forwards the client's
+        token. Returns `None` on failure to allow callers to handle errors
+        without raising during diagnostic runs.
+        """
+        try:
+            path = snapshot_download(
+                repo_id,
+                repo_type=repo_type,
+                cache_dir=cache_dir,
+                token=(self._api.token if hasattr(self._api, "token") else None),
+            )
+            return path
+        except Exception:  # noqa: BLE001
+            return None
 
 
 __all__ = ["HfClient", "HuggingFaceConfig"]
