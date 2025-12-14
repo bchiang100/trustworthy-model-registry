@@ -5,7 +5,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 
 from acme_cli.hf.client import HfClient
 from huggingface_hub import HfApi
@@ -85,6 +85,57 @@ class LineageGraph:
 
     def __repr__(self) -> str:
         return f"LineageGraph(root={self.root_repo_id}, nodes={len(self.nodes)})"
+
+    def to_artifact_lineage_graph(self, name_resolver: Callable[[str], str] | None = None) -> dict:
+        """Serialize the LineageGraph into the OpenAPI-compatible
+        ArtifactLineageGraph format.
+
+        Args:
+            name_resolver: Optional callable taking a repo_id and returning a
+                human-friendly name. If not provided the repo name (after
+                the slash) or repo_id will be used.
+
+        Returns:
+            dict matching the OpenAPI `ArtifactLineageGraph` schema with
+            `nodes` (array) and `edges` (array).
+        """
+        nodes = []
+        edges = []
+
+        for repo_id, node in self.nodes.items():
+            # Determine a human-friendly name
+            if name_resolver:
+                name = name_resolver(repo_id)
+            else:
+                name = node.metadata.get("display_name") or repo_id.split("/")[-1]
+
+            source = node.metadata.get("source", "config_json")
+
+            # include discovered depth in node metadata for diagnostics
+            node_metadata = dict(node.metadata or {})
+            depth = self.discovered_at.get(repo_id)
+            if depth is not None:
+                node_metadata.setdefault("discovered_at", depth)
+
+            nodes.append(
+                {
+                    "artifact_id": repo_id,
+                    "name": name,
+                    "source": source,
+                    "metadata": node_metadata,
+                }
+            )
+
+            for parent in node.parent_ids:
+                edges.append(
+                    {
+                        "from_node_artifact_id": parent,
+                        "to_node_artifact_id": repo_id,
+                        "relationship": "base_model",
+                    }
+                )
+
+        return {"nodes": nodes, "edges": edges}
 
 
 class LineageExtractor:
