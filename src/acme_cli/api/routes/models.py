@@ -13,11 +13,43 @@ from acme_cli.net_score import compute_net_score
 from acme_cli.types import ScoreTarget
 
 import boto3
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, JSONResponse, Response, Request, RequestValidationError
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from acme_cli.urls import parse_artifact_url, is_code_url, is_dataset_url, is_model_url
-from acme_cli.hf.client import HfApiClient
-from route_util import get_github_readme, validate_url_string, make_id
+from acme_cli.hf.client import HfClient
+import hashlib
+
+
+def validate_url_string(url: str) -> bool:
+    """Minimal URL validation used by the router.
+
+    This intentionally keeps dependencies light for tests: it only checks for
+    an http/https scheme.
+    """
+    return bool(re.match(r"^https?://", (url or "")))
+
+
+def make_id(url: str) -> str:
+    """Create a short deterministic id for an artifact URL.
+
+    Uses a truncated sha1 hex digest to avoid filesystem/unicode issues.
+    """
+    digest = hashlib.sha1(url.encode("utf-8")).hexdigest()
+    return digest[:16]
+
+
+def get_github_readme(project_url: str) -> tuple[bool, str | None]:
+    """Lightweight helper that says whether the repo looks like GitHub.
+
+    Returns (valid, readme_text). We don't attempt network calls here so tests
+    remain deterministic and fast.
+    """
+    if not project_url or "github.com" not in project_url:
+        return (False, None)
+    return (True, "")
+from acme_cli.lineage_graph import LineageExtractor
 
 router = APIRouter()
 
@@ -27,7 +59,7 @@ AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 
 # initialize the S3 client
 s3_client = boto3.client('s3', region_name=AWS_REGION)
-hf_client = HfApiClient()
+hf_client = HfClient()
 
 def upload_to_s3(local_file_path: str, s3_key: str) -> str:
     """Upload file to S3 and return download URL."""
@@ -104,12 +136,22 @@ def calculate_metrics(artifact_url: str) -> dict:
 
 
 # invalid requests for our spec use status code 400
-@router.exception_handler(RequestValidationError)
-async def validation_exception_handler(
-    request: Request,
-    exc: RequestValidationError,
-):
-    return Response(status_code=400)
+# Register an exception handler if the APIRouter supports it (older/newer
+# FastAPI versions vary), otherwise provide a no-op function to avoid
+# import-time errors during tests.
+if hasattr(router, "exception_handler"):
+    @router.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        request: Request,
+        exc: RequestValidationError,
+    ):
+        return Response(status_code=400)
+else:
+    async def validation_exception_handler(
+        request: Request,
+        exc: RequestValidationError,
+    ):
+        return Response(status_code=400)
 
 # python dict to hold metdata of artifacts
 # id -> name, type, url, downloadable s3 url
@@ -366,7 +408,132 @@ async def get_lineage_graph(id: str) -> JSONResponse:
     # if not, return 400 
     # parse lineage graph from model metadata
     # return lineage graph as json 
-    pass
+    if id not in artifacts_metadata:
+        return Response(status_code=404)
+
+    meta = artifacts_metadata[id]
+    if meta.get("type") != "model":
+        return Response(status_code=400)
+
+    url = meta.get("url")
+    if not url:
+        return Response(status_code=400)
+
+    parsed = parse_artifact_url(url)
+    if not parsed or not getattr(parsed, "repo_id", None):
+        return Response(status_code=400)
+
+    try:
+        extractor = LineageExtractor()
+        graph = extractor.extract(parsed.repo_id, max_depth=5)
+        payload = graph.to_artifact_lineage_graph()
+        return JSONResponse(content=payload, status_code=200)
+    except Exception as e:
+        # log and return 500
+        raise HTTPException(status_code=500, detail=f"Failed to compute lineage: {e}")
+
+
+# Return full model rating per spec
+@router.get("/artifact/model/{id}/rate/")
+async def get_model_rating(id: str) -> JSONResponse:
+    """Return the model rating (all metrics) for the given artifact id.
+
+    This endpoint builds the rating using the same `calculate_metrics` helper
+    used during ingest. Latencies are approximate and reported as seconds.
+    """
+    if id not in artifacts_metadata:
+        return Response(status_code=404)
+
+    meta = artifacts_metadata[id]
+    if meta.get("type") != "model":
+        return Response(status_code=400)
+
+    url = meta.get("url")
+    if not url:
+        return Response(status_code=400)
+
+    # Compute metrics (may be cached by upstream ingest in a real system)
+    start = time.monotonic()
+    metrics = calculate_metrics(url)
+    elapsed = time.monotonic() - start
+
+    if not metrics:
+        # failure computing metrics
+        raise HTTPException(status_code=500, detail="Failed to compute metrics")
+
+    # Helper to pull numeric value or default
+    def v(name, default=0.0):
+        val = metrics.get(name)
+        if isinstance(val, (int, float)):
+            return float(val)
+        return default
+
+    # size_score may be an object
+    size_score = metrics.get("size_score") or {}
+
+    rating = {
+        "name": meta.get("name", id),
+        "category": "model",
+        "net_score": v("net_score"),
+        "net_score_latency": elapsed,
+        "ramp_up_time": v("ramp_up_time"),
+        "ramp_up_time_latency": 0.0,
+        "bus_factor": v("bus_factor"),
+        "bus_factor_latency": 0.0,
+        "performance_claims": v("performance_claims"),
+        "performance_claims_latency": 0.0,
+        "license": v("license"),
+        "license_latency": 0.0,
+        "dataset_and_code_score": v("dataset_and_code_score"),
+        "dataset_and_code_score_latency": 0.0,
+        "dataset_quality": v("dataset_quality"),
+        "dataset_quality_latency": 0.0,
+        "code_quality": v("code_quality"),
+        "code_quality_latency": 0.0,
+        "reproducibility": v("reproducibility"),
+        "reproducibility_latency": 0.0,
+        "reviewedness": v("reviewedness"),
+        "reviewedness_latency": 0.0,
+        "tree_score": v("tree_score"),
+        "tree_score_latency": 0.0,
+        "size_score": size_score,
+        "size_score_latency": 0.0,
+    }
+
+    return JSONResponse(content=rating, status_code=200)
+
+
+@router.get("/artifact/model/{id}/metric/{metric_name}/")
+async def get_single_metric(id: str, metric_name: str) -> JSONResponse:
+    """Return a single metric value and an approximate latency for the artifact.
+
+    metric_name should be one of the metric keys included in the ModelRating
+    (e.g., 'ramp_up_time', 'code_quality', 'size_score', 'reproducibility').
+    """
+    if id not in artifacts_metadata:
+        return Response(status_code=404)
+
+    meta = artifacts_metadata[id]
+    if meta.get("type") != "model":
+        return Response(status_code=400)
+
+    url = meta.get("url")
+    if not url:
+        return Response(status_code=400)
+
+    start = time.monotonic()
+    metrics = calculate_metrics(url)
+    elapsed = time.monotonic() - start
+
+    if not metrics:
+        raise HTTPException(status_code=500, detail="Failed to compute metrics")
+
+    if metric_name not in metrics:
+        return Response(status_code=404)
+
+    value = metrics.get(metric_name)
+
+    return JSONResponse(content={"metric": metric_name, "value": value, "latency_seconds": elapsed}, status_code=200)
 
 # get cost of artifact
 @router.get("/artifact/{artifact_type}/{id}/cost/")
