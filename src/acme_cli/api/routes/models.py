@@ -164,12 +164,12 @@ class QueryRequest(BaseModel):
 ## SPEC COMPLIANT ENDPOINTS 
 
 # health check / heartbeat
-@router.get("/health/")
+@router.get("/health")
 async def get_health():
     return Response(status_code = 200)
 
 # query artifacts
-@router.post("/artifacts/")
+@router.post("/artifacts")
 async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
     pagination_offset: int = int(offset)
 
@@ -201,14 +201,14 @@ async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
     return JSONResponse(content=artifacts, headers=headers, status_code=200)
 
 # reset registry (remove all entries)
-@router.delete("/reset/")
+@router.delete("/reset")
 async def reset_registry():
     # TODO: implement logic to batch enumerate from s3 and delete
     # TODO: also clear metadata dicts 
     return Response(status_code=200)
 
 # get specific artifact
-@router.get("/artifact/{artifact_type}/{id}/")
+@router.get("/artifact/{artifact_type}/{id}")
 async def get_artifact(artifact_type: str, id: str):
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
@@ -225,7 +225,7 @@ async def get_artifact(artifact_type: str, id: str):
     return JSONResponse(content=artifact, status_code=200)
 
 # update specific artifact
-@router.put("/artifact/{artifact_type}/{id}/")
+@router.put("/artifact/{artifact_type}/{id}")
 async def update_artifact(artifact_type: str, id: str, request: UpdateArtifactRequest):
     artifact_metadata = request.metadata
     artifact_data = request.data 
@@ -253,7 +253,7 @@ async def update_artifact(artifact_type: str, id: str, request: UpdateArtifactRe
     return Response(status_code=200)
 
 # ingest artifact
-@router.put("/artifact/{artifact_type}/")
+@router.put("/artifact/{artifact_type}")
 async def ingest_artifact(artifact_type: str, request: IngestRequest):
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
@@ -334,7 +334,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
         return Response(status_code=424)
 
 # Get track
-@router.get("/tracks/")
+@router.get("/tracks")
 async def get_tracks():
     # return track as json
     return JSONResponse(content={"plannedTracks": "Performance track"}, status_code=200)
@@ -406,7 +406,7 @@ async def get_artifacts(request: RegexSearch):
     return JSONResponse(content=matching_artifacts, status_code=200)
 
 # license check of model against github project 
-@router.post("/artifact/model/{id}/license-check/")
+@router.post("/artifact/model/{id}/license-check")
 async def check_license(id: str, request: LicenseCheckRequest) -> JSONResponse:
     # checks if artifact is not in registry
     project_url = request.github_url
@@ -487,7 +487,7 @@ async def check_license(id: str, request: LicenseCheckRequest) -> JSONResponse:
     )
 
 # get lineage graph of model, refer to evan's metric generation for that 
-@router.post("/artifact/model/{id}/lineage/")
+@router.post("/artifact/model/{id}/lineage")
 async def get_lineage_graph(id: str) -> JSONResponse:
     # check if id exists in the registry metadata db 
     # if it does not, return 404
@@ -521,7 +521,7 @@ async def get_lineage_graph(id: str) -> JSONResponse:
 
 
 # Return full model rating per spec
-@router.get("/artifact/model/{id}/rate/")
+@router.get("/artifact/model/{id}/rate")
 async def get_model_rating(id: str) -> JSONResponse:
     """Return the model rating (all metrics) for the given artifact id.
 
@@ -549,7 +549,7 @@ async def get_model_rating(id: str) -> JSONResponse:
         raise HTTPException(status_code=500, detail="Failed to compute metrics")
 
     # Helper to pull numeric value or default
-    def v(name, default=0.0):
+    def get_metric_val(name, default=0.0):
         val = metrics.get(name)
         if isinstance(val, (int, float)):
             return float(val)
@@ -561,27 +561,27 @@ async def get_model_rating(id: str) -> JSONResponse:
     rating = {
         "name": meta.get("name", id),
         "category": "model",
-        "net_score": v("net_score"),
+        "net_score": get_metric_val("net_score"),
         "net_score_latency": elapsed,
-        "ramp_up_time": v("ramp_up_time"),
+        "ramp_up_time": get_metric_val("ramp_up_time"),
         "ramp_up_time_latency": 0.0,
-        "bus_factor": v("bus_factor"),
+        "bus_factor": get_metric_val("bus_factor"),
         "bus_factor_latency": 0.0,
-        "performance_claims": v("performance_claims"),
+        "performance_claims": get_metric_val("performance_claims"),
         "performance_claims_latency": 0.0,
-        "license": v("license"),
+        "license": get_metric_val("license"),
         "license_latency": 0.0,
-        "dataset_and_code_score": v("dataset_and_code_score"),
+        "dataset_and_code_score": get_metric_val("dataset_and_code_score"),
         "dataset_and_code_score_latency": 0.0,
-        "dataset_quality": v("dataset_quality"),
+        "dataset_quality": get_metric_val("dataset_quality"),
         "dataset_quality_latency": 0.0,
-        "code_quality": v("code_quality"),
+        "code_quality": get_metric_val("code_quality"),
         "code_quality_latency": 0.0,
-        "reproducibility": v("reproducibility"),
+        "reproducibility": get_metric_val("reproducibility"),
         "reproducibility_latency": 0.0,
-        "reviewedness": v("reviewedness"),
+        "reviewedness": get_metric_val("reviewedness"),
         "reviewedness_latency": 0.0,
-        "tree_score": v("tree_score"),
+        "tree_score": get_metric_val("tree_score"),
         "tree_score_latency": 0.0,
         "size_score": size_score,
         "size_score_latency": 0.0,
@@ -590,40 +590,40 @@ async def get_model_rating(id: str) -> JSONResponse:
     return JSONResponse(content=rating, status_code=200)
 
 
-@router.get("/artifact/model/{id}/metric/{metric_name}/")
-async def get_single_metric(id: str, metric_name: str) -> JSONResponse:
-    """Return a single metric value and an approximate latency for the artifact.
+# @router.get("/artifact/model/{id}/metric/{metric_name}/")
+# async def get_single_metric(id: str, metric_name: str) -> JSONResponse:
+#     """Return a single metric value and an approximate latency for the artifact.
 
-    metric_name should be one of the metric keys included in the ModelRating
-    (e.g., 'ramp_up_time', 'code_quality', 'size_score', 'reproducibility').
-    """
-    if id not in artifacts_metadata:
-        return Response(status_code=404)
+#     metric_name should be one of the metric keys included in the ModelRating
+#     (e.g., 'ramp_up_time', 'code_quality', 'size_score', 'reproducibility').
+#     """
+#     if id not in artifacts_metadata:
+#         return Response(status_code=404)
 
-    meta = artifacts_metadata[id]
-    if meta.get("type") != "model":
-        return Response(status_code=400)
+#     meta = artifacts_metadata[id]
+#     if meta.get("type") != "model":
+#         return Response(status_code=400)
 
-    url = meta.get("url")
-    if not url:
-        return Response(status_code=400)
+#     url = meta.get("url")
+#     if not url:
+#         return Response(status_code=400)
 
-    start = time.monotonic()
-    metrics = calculate_metrics(url)
-    elapsed = time.monotonic() - start
+#     start = time.monotonic()
+#     metrics = calculate_metrics(url)
+#     elapsed = time.monotonic() - start
 
-    if not metrics:
-        raise HTTPException(status_code=500, detail="Failed to compute metrics")
+#     if not metrics:
+#         raise HTTPException(status_code=500, detail="Failed to compute metrics")
 
-    if metric_name not in metrics:
-        return Response(status_code=404)
+#     if metric_name not in metrics:
+#         return Response(status_code=404)
 
-    value = metrics.get(metric_name)
+#     value = metrics.get(metric_name)
 
-    return JSONResponse(content={"metric": metric_name, "value": value, "latency_seconds": elapsed}, status_code=200)
+#     return JSONResponse(content={"metric": metric_name, "value": value, "latency_seconds": elapsed}, status_code=200)
 
 # get cost of artifact
-@router.get("/artifact/{artifact_type}/{id}/cost/")
+@router.get("/artifact/{artifact_type}/{id}/cost")
 async def get_artifact_cost(artifact_type: str, id: str, dependency: bool = False) -> JSONResponse:
     """Return the cost (download size in MB) of an artifact, optionally including dependencies.
     
@@ -655,7 +655,6 @@ async def get_artifact_cost(artifact_type: str, id: str, dependency: bool = Fals
             metrics = calculate_metrics(artifact_url)
             # Metrics includes model_metadata which has file list with sizes
             # For now, estimate based on the artifact type and common model sizes
-            # In a real system, this would read from model_metadata.files
             
             # Parse the artifact URL to get metadata
             parsed = parse_artifact_url(artifact_url)

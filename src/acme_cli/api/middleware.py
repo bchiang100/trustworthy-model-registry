@@ -5,7 +5,7 @@ import time
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .monitoring import get_metrics_collector
+from monitoring import get_metrics_collector
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
