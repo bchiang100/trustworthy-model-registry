@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 # S3 config
-S3_BUCKET_NAME = os.getenv("ACME_S3_BUCKET", "acme-model-registry")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+S3_BUCKET_NAME = "461-model-registry-ui"
+AWS_REGION = "us-east-2"
 
 # initialize the S3 client
 s3_client = boto3.client('s3', region_name=AWS_REGION)
@@ -47,12 +47,8 @@ def upload_to_s3(local_file_path: str, s3_key: str) -> str:
     """Upload file to S3 and return download URL."""
     try:
         s3_client.upload_file(local_file_path, S3_BUCKET_NAME, s3_key)
-        # generates download URL
-        download_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': S3_BUCKET_NAME, 'Key': s3_key},
-            ExpiresIn=3600
-        )
+        # download url is determinstic 
+        download_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
         return download_url
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"S3 upload failed: {str(e)}")
@@ -353,18 +349,18 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
     if rating >= 0.2: # trustworthy
         try:
             # download artifact from huggingface
-            # local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
+            local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
 
             # creates S3 key for the artifact
-            # s3_key = f"{artifact_type}/{id}/.tar.gz"
+            s3_key = f"{artifact_type}/{id}/.tar.gz"
 
             # upload to S3 and get download URL
-            # download_url = upload_to_s3(local_file_path, s3_key)
+            download_url = upload_to_s3(local_file_path, s3_key)
 
             # Clean up local file
-            # import os
-            # os.remove(local_file_path)
-            # os.rmdir(os.path.dirname(local_file_path))
+            import os
+            os.remove(local_file_path)
+            os.rmdir(os.path.dirname(local_file_path))
 
 
             # store metadata in memory
@@ -372,7 +368,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
                 "name": artifact_name,
                 "type": artifact_type,
                 "url": artifact_url,
-                # "download_url": download_url,
+                "download_url": download_url,
                 # "s3_key": s3_key
             }
             artifact_ids.append(id)
@@ -399,7 +395,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
         
         except Exception as e:
             # If S3 upload fails, return 500
-            raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"S3 Upload failed: {str(e)}")
     else:
         # if rating fails, return 424
         return Response(status_code=424)
