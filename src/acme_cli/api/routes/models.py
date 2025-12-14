@@ -1,5 +1,6 @@
 # manages model endpoints for CR[U]D operations
 
+import logging
 import re
 import os
 import tempfile
@@ -13,9 +14,9 @@ from acme_cli.net_score import compute_net_score
 from acme_cli.types import ScoreTarget
 
 import boto3
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, Request
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, Response, Request
+from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from acme_cli.urls import parse_artifact_url, is_code_url, is_dataset_url, is_model_url
 from acme_cli.hf.client import HfClient
@@ -28,6 +29,7 @@ from acme_cli.llm import LlmEvaluator
 from acme_cli.lineage_graph import LineageExtractor
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # S3 config
@@ -116,22 +118,13 @@ def calculate_metrics(artifact_url: str) -> dict:
 
 
 # invalid requests for our spec use status code 400
-# Register an exception handler if the APIRouter supports it (older/newer
-# FastAPI versions vary), otherwise provide a no-op function to avoid
-# import-time errors during tests.
-if hasattr(router, "exception_handler"):
-    @router.exception_handler(RequestValidationError)
-    async def validation_exception_handler(
-        request: Request,
-        exc: RequestValidationError,
-    ):
-        return Response(status_code=400)
-else:
-    async def validation_exception_handler(
-        request: Request,
-        exc: RequestValidationError,
-    ):
-        return Response(status_code=400)
+# Note: exception_handler should be registered on app, not router
+# @router.exception_handler(RequestValidationError)
+# async def validation_exception_handler(
+#     request: Request,
+#     exc: RequestValidationError,
+# ):
+#     return Response(status_code=400)
 
 # python data structures to hold metdata of artifacts
 # id -> name, type, url, downloadable s3 url
@@ -632,6 +625,15 @@ async def get_single_metric(id: str, metric_name: str) -> JSONResponse:
 # get cost of artifact
 @router.get("/artifact/{artifact_type}/{id}/cost/")
 async def get_artifact_cost(artifact_type: str, id: str, dependency: bool = False) -> JSONResponse:
+    """Return the cost (download size in MB) of an artifact, optionally including dependencies.
+    
+    Per the OpenAPI spec, cost is defined as the total download size required for the artifact,
+    and optionally includes the sizes of dependencies (parent models in the lineage).
+    
+    Response structure:
+    - Without dependencies: { "artifact_id": { "total_cost": <size_in_mb> } }
+    - With dependencies: { "artifact_id": { "standalone_cost": <size>, "total_cost": <sum> }, ... }
+    """
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
     # check if id exists in the registry metadata db

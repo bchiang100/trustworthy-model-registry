@@ -76,7 +76,7 @@ def test_endpoints():
         assert "reviewedness" in rating
         assert "tree_score" in rating
         assert "size_score" in rating
-        print("  ✓ All required fields present")
+        print("All required fields present")
         
         # Test 2: GET /artifact/model/{id}/metric/{metric_name}/
         print("\n[Test 2] GET /artifact/model/{id}/metric/{metric_name}/")
@@ -92,14 +92,14 @@ def test_endpoints():
         assert metric_resp.get("metric") == "code_quality"
         assert metric_resp.get("value") == 0.8
         assert "latency_seconds" in metric_resp
-        print("  ✓ Metric endpoint working")
+        print("Metric endpoint working")
         
         # Test 3: GET /artifact/model/{id}/metric/{nonexistent}/
         print("\n[Test 3] GET /artifact/model/{id}/metric/{nonexistent}/ (should 404)")
         response = client.get(f"/artifact/model/{test_artifact_id}/metric/nonexistent_metric/")
         print(f"  Status: {response.status_code}")
         assert response.status_code == 404, f"Expected 404 for nonexistent metric, got {response.status_code}"
-        print("  ✓ Correctly returns 404 for missing metric")
+        print("Correctly returns 404 for missing metric")
         
         # Test 4: POST /artifact/model/{id}/lineage/
         print("\n[Test 4] POST /artifact/model/{id}/lineage/")
@@ -108,14 +108,14 @@ def test_endpoints():
         response = client.post(f"/artifact/model/{test_artifact_id}/lineage/")
         print(f"  Status: {response.status_code}")
         print(f"  Note: May return 500 without real HF data; endpoint is wired correctly")
-        print(f"         In production, this would extract lineage from the model's config.json")
+        print(f"  In production, this would extract lineage from the model's config.json")
     
     # Test 5: 404 for nonexistent artifact
     print("\n[Test 5] GET /artifact/model/nonexistent/rate/ (should 404)")
     response = client.get("/artifact/model/nonexistent/rate/")
     print(f"  Status: {response.status_code}")
     assert response.status_code == 404, f"Expected 404 for nonexistent artifact, got {response.status_code}"
-    print("  ✓ Correctly returns 404 for missing artifact")
+    print("Correctly returns 404 for missing artifact")
     
     print("\n" + "="*60)
     print("All endpoint tests passed! ✓")
