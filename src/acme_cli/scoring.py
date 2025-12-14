@@ -68,6 +68,9 @@ def _build_record(model_url: str, context, outcome) -> dict[str, Any]:  # type: 
     record.update(_metric_field(outcome, "dataset_and_code_score", 0.0))
     record.update(_metric_field(outcome, "dataset_quality", 0.0))
     record.update(_metric_field(outcome, "code_quality", 0.0))
+    record.update(_metric_field(outcome, "reproducibility", 0.0))
+    record.update(_metric_field(outcome, "reviewedness", 0.0))
+    record.update(_metric_field(outcome, "tree_score", 0.0))
     size_value, size_latency = _metric_value(outcome, "size_score", {})
     if not size_value:
         size_value = {
@@ -131,6 +134,12 @@ def _empty_record(model_url: str, error: str | None = None) -> dict[str, Any]:
         "dataset_quality_latency": 0,
         "code_quality": 0.0,
         "code_quality_latency": 0,
+        "reproducibility": 0.0,
+        "reproducibility_latency": 0,
+        "reviewedness": 0.0,
+        "reviewedness_latency": 0,
+        "tree_score": 0.0,
+        "tree_score_latency": 0,
     }
     if error:
         record["error"] = error
