@@ -53,7 +53,7 @@ def upload_to_s3(local_file_path: str, s3_key: str) -> str:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"S3 upload failed: {str(e)}")
 
-def download_artifact_from_hf(url: str, artifact_id: str) -> str:
+def download_artifact_from_hf(url: str, artifact_id: int) -> str:
     """Download artifact from Hugging Face and return local path."""
     try:
         parsed_url = parse_artifact_url(url)
@@ -162,7 +162,7 @@ class IngestRequest(BaseModel):
 
 class ArtifactMetadata(BaseModel):
     name: str
-    id: str 
+    id: int 
     type: str  # "model", "dataset", "code" 
 
 class ArtifactData(BaseModel):
@@ -261,7 +261,7 @@ async def get_artifact(artifact_type: str, id: int):
 
 # update specific artifact
 @router.put("/artifacts/{artifact_type}/{id}")
-async def update_artifact(artifact_type: str, id: str, request: UpdateArtifactRequest):
+async def update_artifact(artifact_type: str, id: int, request: UpdateArtifactRequest):
     artifact_metadata = request.metadata
     artifact_data = request.data 
 
@@ -491,7 +491,7 @@ async def get_tracks():
 
 # license check of model against github project 
 @router.post("/artifact/model/{id}/license-check")
-async def check_license(id: str, request: LicenseCheckRequest) -> JSONResponse:
+async def check_license(id: int, request: LicenseCheckRequest) -> JSONResponse:
     # checks if artifact is not in registry
     project_url = request.github_url
     if id not in artifacts_metadata: 
@@ -572,7 +572,7 @@ async def check_license(id: str, request: LicenseCheckRequest) -> JSONResponse:
 
 # get lineage graph of model, refer to evan's metric generation for that 
 @router.post("/artifact/model/{id}/lineage")
-async def get_lineage_graph(id: str) -> JSONResponse:
+async def get_lineage_graph(id: int) -> JSONResponse:
     # check if id exists in the registry metadata db 
     # if it does not, return 404
     # check if artifact is a model
@@ -606,7 +606,7 @@ async def get_lineage_graph(id: str) -> JSONResponse:
 
 # Return full model rating per spec
 @router.get("/artifact/model/{id}/rate")
-async def get_model_rating(id: str) -> JSONResponse:
+async def get_model_rating(id: int) -> JSONResponse:
     """Return the model rating (all metrics) for the given artifact id.
 
     This endpoint builds the rating using the same `calculate_metrics` helper
@@ -708,7 +708,7 @@ async def get_model_rating(id: str) -> JSONResponse:
 
 # get cost of artifact
 @router.get("/artifact/{artifact_type}/{id}/cost")
-async def get_artifact_cost(artifact_type: str, id: str, dependency: bool = False) -> JSONResponse:
+async def get_artifact_cost(artifact_type: str, id: int, dependency: bool = False) -> JSONResponse:
     """Return the cost (download size in MB) of an artifact, optionally including dependencies.
     
     Per the OpenAPI spec, cost is defined as the total download size required for the artifact,
