@@ -69,5 +69,33 @@ class LlmEvaluator:
             )
         return clamp(float(match.group(1)))
 
+    def judge_license_compatibility(self, project_license: str, model_license: str) -> bool:
+        """Ask the LLM whether the project license is compatible with the model license.
+
+        Returns True if the model can be used under the project license, False otherwise.
+        Any errors or unparsable responses fall back to False.
+        """
+        prompt = (
+            "You are an expert open-source license compatibility checker. "
+            "Given a project license and a model license, answer with only 'true' if the project "
+            "license permits using the model for fine-tuning and inference under its terms, "
+            "or 'false' otherwise.\nProject license:\n"
+            + project_license
+            + "\nModel license:\n"
+            + model_license
+            + "\nAnswer:"
+        )
+        try:
+            response = self._client.text_generation(
+                prompt, max_new_tokens=16, temperature=0.0
+            )
+            text = str(response)
+            m = re.search(r"\b(true|false)\b", text, re.I)
+            if not m:
+                return False
+            return m.group(1).lower() == "true"
+        except Exception:
+            return False
+
 
 __all__ = ["LlmEvaluator", "LlmUnavailable", "LlmConfig", "DEFAULT_LLM_MODEL"]
