@@ -205,7 +205,18 @@ async def reset_registry():
     artifacts_metadata.clear()
     artifact_ids.clear()
     artifact_name_to_id.clear()
-    # TODO: implement logic to batch enumerate from s3 and delete
+
+    # clears data in s3 bucket
+    paginator = s3_client.get_paginator('list_objects_v2')
+    pages = paginator.paginate(Bucket=S3_BUCKET_NAME)
+
+    for page in pages:
+        if 'Contents' in page:
+            objects_to_delete = [{'Key': obj['Key']} for obj in page['Contents']]
+            s3_client.delete_objects(
+                Bucket=S3_BUCKET_NAME,
+                Delete={'Objects': objects_to_delete}
+            )
     return Response(status_code=200)
 
 # get specific artifact
