@@ -9,6 +9,12 @@ __pycache__
 *.pyd
 *.so
 
+# ignore editor files
+.vscode/*
+# ignore random scripts 
+scripts/*
+
+
 # Ignore Python virtual environment
 .venv
 

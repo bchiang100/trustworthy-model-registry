@@ -22,11 +22,13 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         # Record request start
         endpoint = str(request.url.path)
         method = request.method
+        # metrics dispatch start
 
         # Process the request
         try:
             response = await call_next(request)
             status_code = response.status_code
+            # call_next returned
         except Exception as e:
             # Log error and return 500
             self.metrics_collector.add_log(f"Request error: {str(e)}", "ERROR")
