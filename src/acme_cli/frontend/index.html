@@ -22,10 +22,13 @@
     <section class="intro">
       <p>This is a mock frontend for a model registry (current pages: upload, rate, delete, ingest, license check, enumerate). Use the navigation to try pages. All implementations are local.</p>
     </section>
-
     <section id="recent">
       <h2>Sample Models</h2>
-      <div id="model-list" class="card-grid"></div>
+      <div id="model-list" class="card-grid" role="region" aria-live="polite"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button onclick="doReset()" class="secondary">Reset Registry</button>
+        <small class="muted">Reset will clear all in-memory metadata and remote S3 objects (if enabled).</small>
+      </div>
     </section>
   </main>
 

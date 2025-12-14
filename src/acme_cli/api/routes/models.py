@@ -391,10 +391,58 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
             # upload to S3 and get download URL
             download_url = upload_to_s3(local_file_path, s3_key)
 
-            # Clean up local file
+            # Clean up local file and temporary directory. Use recursive removal
+            # because HF downloads or intermediate tooling may leave extra files
+            # (e.g., cache dirs) in the temporary directory which prevents
+            # `os.rmdir` from succeeding.
             import os
-            os.remove(local_file_path)
-            os.rmdir(os.path.dirname(local_file_path))
+            import shutil
+            try:
+                if os.path.exists(local_file_path):
+                    os.remove(local_file_path)
+            except Exception:
+                # best-effort cleanup; do not fail the request because of cleanup
+                pass
+            try:
+                def _on_rm_error(func, path, exc_info):
+                    # try to make writable and retry
+                    try:
+                        os.chmod(path, 0o700)
+                    except Exception:
+                        pass
+                    try:
+                        func(path)
+                    except Exception:
+                        pass
+
+                shutil.rmtree(os.path.dirname(local_file_path), onerror=_on_rm_error)
+            except Exception:
+                # as a final fallback, attempt to remove files then the dir
+                try:
+                    for root, dirs, files in os.walk(os.path.dirname(local_file_path), topdown=False):
+                        for name in files:
+                            try:
+                                os.chmod(os.path.join(root, name), 0o600)
+                                os.remove(os.path.join(root, name))
+                            except Exception:
+                                pass
+                        for name in dirs:
+                            try:
+                                os.rmdir(os.path.join(root, name))
+                            except Exception:
+                                pass
+                    try:
+                        os.rmdir(os.path.dirname(local_file_path))
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            # If the temp dir still exists, log a warning for diagnostics
+            try:
+                if os.path.exists(os.path.dirname(local_file_path)):
+                    logger.warning("Temp dir still exists after cleanup: %s", os.path.dirname(local_file_path))
+            except Exception:
+                pass
 
 
             # store metadata in memory
