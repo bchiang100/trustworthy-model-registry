@@ -12,31 +12,6 @@ metrics_collector = MetricsCollector()
 system_monitor = SystemMonitor()
 
 
-@router.get("/health")
-async def health_check():
-    """Basic system health check endpoint."""
-    try:
-        system_stats = await system_monitor.get_system_stats()
-        return {
-            "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "service": "acme-registry",
-            "version": "0.1.0",
-            "uptime": system_stats.get("uptime", "operational"),
-            "dependencies": {
-                "database": "connected",
-                "storage": "available",
-                "memory_usage": system_stats.get("memory_percent"),
-                "cpu_usage": system_stats.get("cpu_percent"),
-            },
-        }
-    except Exception as e:
-        return {
-            "status": "degraded",
-            "timestamp": datetime.utcnow().isoformat(),
-            "error": str(e),
-        }
-
 
 @router.get("/health/dashboard")
 async def health_dashboard():
