@@ -22,7 +22,7 @@ class LlmConfig:
     model: str = os.getenv("ACME_LLM_MODEL", DEFAULT_LLM_MODEL)
     token: str | None = os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv(
         "HF_API_TOKEN"
-    )
+    ) # this API token is used to gain access to LLMs from HF API
     timeout: float = float(os.getenv("ACME_LLM_TIMEOUT", "30"))
 
 
