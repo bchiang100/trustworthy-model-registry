@@ -17,6 +17,7 @@ scripts/*
 
 # Ignore Python virtual environment
 .venv
+.env
 
 # Ignore Python build files
 build

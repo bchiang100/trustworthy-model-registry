@@ -161,6 +161,7 @@ class QueryRequest(BaseModel):
     name: str 
     types: List[str]  # "model", "dataset", "code"
 
+
 ## SPEC COMPLIANT ENDPOINTS 
 
 # health check / heartbeat
@@ -174,7 +175,7 @@ async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
     pagination_offset: int = int(offset)
 
     # enumerate all artifacts in the registry metadata up to pagination size or end of registry
-    if len(request) == 0:
+    if len(request) == 1 and request[0].name == "*":
         artifacts = []
         for id in artifact_ids[pagination_offset:min(pagination_offset+PAGINATION_SIZE, len(artifacts_metadata))]:
             name = artifacts_metadata[id]["name"]
@@ -204,13 +205,16 @@ async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
 # reset registry (remove all entries)
 @router.delete("/reset")
 async def reset_registry():
+    # clear all stored metadata
+    artifacts_metadata.clear()
+    artifact_ids.clear()
+    artifact_name_to_id.clear()
     # TODO: implement logic to batch enumerate from s3 and delete
-    # TODO: also clear metadata dicts 
     return Response(status_code=200)
 
 # get specific artifact
 @router.get("/artifact/{artifact_type}/{id}")
-async def get_artifact(artifact_type: str, id: str):
+async def get_artifact(artifact_type: str, id: int):
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
     # check if id exists in the registry metadata db 
@@ -253,95 +257,8 @@ async def update_artifact(artifact_type: str, id: str, request: UpdateArtifactRe
     artifacts_metadata[id]["download_url"] = download_link
     return Response(status_code=200)
 
-# ingest artifact
-@router.post("/artifact/{artifact_type}")
-async def ingest_artifact(artifact_type: str, request: IngestRequest):
-    if artifact_type not in ["model", "dataset", "code"]:
-        return Response(status_code=400)
-
-    # ensure that the url itself is valid
-    artifact_url = request.url
-    artifact_name = request.name
-    if not validate_url_string(artifact_url):
-        # invalid url type
-        return Response(status_code=400)
-
-    # check if url exists in the registry metadata db
-    if artifact_url in [meta.get("url") for meta in artifacts_metadata.values()]:
-        # URL already exists, return 409 (Conflict)
-        return Response(status_code=409)
-
-    # retrieves all metric values 
-    metrics = calculate_metrics(artifact_url)
-
-    # rate artifact
-    rating = metrics.get("net_score", 0.0)
-
-    # create id
-    id = make_id(artifact_url)
-
-    if rating >= 0.5: # trustworthy
-        try:
-            # download artifact from huggingface
-            local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
-
-            # creates S3 key for the artifact
-            s3_key = f"{artifact_type}/{id}/.tar.gz"
-
-            # upload to S3 and get download URL
-            download_url = upload_to_s3(local_file_path, s3_key)
-
-            # Clean up local file
-            import os
-            os.remove(local_file_path)
-            os.rmdir(os.path.dirname(local_file_path))
-
-
-            # store metadata in memory
-            artifacts_metadata[id] = {
-                "name": artifact_name,
-                "type": artifact_type,
-                "url": artifact_url,
-                "download_url": download_url,
-                "s3_key": s3_key
-            }
-            artifact_ids.append(id)
-            # for new ids, handles the case where multiple artifacts share the same name
-            if artifact_name not in artifact_name_to_id:
-                artifact_name_to_id[artifact_name] = []
-            artifact_name_to_id[artifact_name].append(id)
-
-            # return artifact metadata and data as json
-            return JSONResponse(
-                content={
-                    "metadata": {
-                        "name": artifact_name,
-                        "id": id,
-                        "type": artifact_type
-                    },
-                    "data": {
-                        "url": artifact_url,
-                        "download_url": download_url
-                    }
-                },
-                status_code=201
-            )
-        
-        except Exception as e:
-            # If S3 upload fails, return 500
-            raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
-    else:
-        # if rating fails, return 424
-        return Response(status_code=424)
-
-# Get track
-@router.get("/tracks")
-async def get_tracks():
-    # return track as json
-    return JSONResponse(content={"plannedTracks": "Performance track"}, status_code=200)
-
 # Regex search
-@router.post("/artifact/byRegEx/")
+@router.post("/artifact/byRegEx")
 async def get_artifacts(request: RegexSearch):
     # grab regex from request, start timer, and store matches in a list 
     regex = request.regex
@@ -405,6 +322,94 @@ async def get_artifacts(request: RegexSearch):
     if not matching_artifacts:
         return Response(status_code=404)
     return JSONResponse(content=matching_artifacts, status_code=200)
+
+# ingest artifact
+@router.post("/artifact/{artifact_type}")
+async def ingest_artifact(artifact_type: str, request: IngestRequest):
+    if artifact_type not in ["model", "dataset", "code"]:
+        return Response(status_code=400)
+
+    # ensure that the url itself is valid
+    artifact_url = request.url
+    artifact_name = request.name
+    if not validate_url_string(artifact_url):
+        # invalid url type
+        return Response(status_code=400)
+
+    # check if url exists in the registry metadata db
+    if artifact_url in [meta.get("url") for meta in artifacts_metadata.values()]:
+        # URL already exists, return 409 (Conflict)
+        return Response(status_code=409)
+
+    # retrieves all metric values 
+    metrics = calculate_metrics(artifact_url)
+
+    # rate artifact
+    rating = metrics.get("net_score", 0.0)
+
+    # create id
+    id = int(make_id(artifact_url))
+
+    if rating >= 0.2: # trustworthy
+        try:
+            # download artifact from huggingface
+            # local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
+
+            # creates S3 key for the artifact
+            # s3_key = f"{artifact_type}/{id}/.tar.gz"
+
+            # upload to S3 and get download URL
+            # download_url = upload_to_s3(local_file_path, s3_key)
+
+            # Clean up local file
+            # import os
+            # os.remove(local_file_path)
+            # os.rmdir(os.path.dirname(local_file_path))
+
+
+            # store metadata in memory
+            artifacts_metadata[id] = {
+                "name": artifact_name,
+                "type": artifact_type,
+                "url": artifact_url,
+                # "download_url": download_url,
+                # "s3_key": s3_key
+            }
+            artifact_ids.append(id)
+            # for new ids, handles the case where multiple artifacts share the same name
+            if artifact_name not in artifact_name_to_id:
+                artifact_name_to_id[artifact_name] = []
+            artifact_name_to_id[artifact_name].append(id)
+
+            # return artifact metadata and data as json
+            return JSONResponse(
+                content={
+                    "metadata": {
+                        "name": artifact_name,
+                        "id": id,
+                        "type": artifact_type
+                    },
+                    "data": {
+                        "url": artifact_url,
+                        # "download_url": download_url
+                    }
+                },
+                status_code=201
+            )
+        
+        except Exception as e:
+            # If S3 upload fails, return 500
+            raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+    else:
+        # if rating fails, return 424
+        return Response(status_code=424)
+
+# Get track
+@router.get("/tracks")
+async def get_tracks():
+    # return track as json
+    return JSONResponse(content={"plannedTracks": "Performance track"}, status_code=200)
+
 
 # license check of model against github project 
 @router.post("/artifact/model/{id}/license-check")
