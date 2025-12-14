@@ -23,12 +23,13 @@ class MetricsCollector:
         self.response_times = deque(maxlen=1000)  # Keep last 1000 response times
         self.logs_buffer = deque(maxlen=500)  # Keep last 500 log entries
         self.start_time = time.time()
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def record_request(
         self, endpoint: str, method: str, status_code: int, response_time_ms: float
     ):
         """Record an API request with metrics."""
+        # record_request start
         with self._lock:
             timestamp = datetime.utcnow()
 
@@ -60,12 +61,11 @@ class MetricsCollector:
             self.response_times.append(response_time_ms)
 
             # Log the request
-            self.add_log(
-                f"[{method}] {endpoint} - {status_code} ({response_time_ms:.1f}ms)"
-            )
+            self.add_log(f"[{method}] {endpoint} - {status_code} ({response_time_ms:.1f}ms)")
 
     def add_log(self, message: str, level: str = "INFO"):
         """Add a log entry to the buffer."""
+        # add_log start
         with self._lock:
             timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
             log_entry = f"[{timestamp}] [{level}] {message}"

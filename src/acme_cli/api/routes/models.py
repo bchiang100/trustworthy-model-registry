@@ -19,8 +19,9 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from acme_cli.urls import parse_artifact_url, is_code_url, is_dataset_url, is_model_url
 from acme_cli.hf.client import HfClient
-from route_util import validate_url_string, get_github_readme, make_id
+from .route_util import validate_url_string, get_github_readme, make_id
 import hashlib
+
 
 
 from acme_cli.lineage_graph import LineageExtractor
@@ -165,29 +166,6 @@ class UpdateArtifactRequest(BaseModel):
 class QueryRequest(BaseModel):
     name: str 
     types: List[str]  # "model", "dataset", "code"
-
-class ModelMetadata(BaseModel):
-    name: str
-    version: str
-    description: Optional[str] = None
-    tags: List[str] = []
-    net_score: float
-    ramp_up_time: float
-    bus_factor: float
-    performance_claims: float
-    license: float
-    dataset_and_code_score: float
-    dataset_quality: float
-    code_quality: float
-    # Phase 2 new metrics
-    reproducibility: (
-        float  # 0 (no code/doesn't run), 0.5 (runs with debugging), 1 (runs perfectly)
-    )
-    reviewedness: (
-        float  # fraction 0-1 of code introduced via PR with review, -1 if no repo
-    )
-    treescore: float  # average of parent model scores according to lineage graph
-
 
 ## SPEC COMPLIANT ENDPOINTS 
 
@@ -372,28 +350,66 @@ async def get_tracks():
 async def get_artifacts(request: RegexSearch):
     # grab regex from request, start timer, and store matches in a list 
     regex = request.regex
-    pattern = re.compile(regex)
+    # compile regex safely
+    try:
+        pattern = re.compile(regex)
+    except re.error:
+        return Response(status_code=400)
 
     start_time = time.monotonic()
-    matching_artifacts = []
+    matching_artifacts: list[dict] = []
 
     # search through artifact metadata to determine if there are any matches
-    for artifact_id in artifacts_metadata(): 
-        name = artifacts_metadata[artifact_id]["name"]
-        if pattern.search(name): # artifact name matches regex
-            type = artifacts_metadata[artifact_id]["type"]
-            artifact_dict = {"name" : name, "id" : artifact_id, "type": type}
-            matching_artifacts.append(artifact_dict) 
-        # should also implement readme searching 
+    for artifact_id, meta in artifacts_metadata.items():
+        name = meta.get("name", "")
+        url = meta.get("url", "")
 
-        if time.monotonic() - start_time > 2: # regex is bad or causing too much backtracking, search time is > 2 seconds
-            Response(status_code=400) # invalid regex
+        # match on name first
+        if pattern.search(name):
+            matching_artifacts.append({"name": name, "id": artifact_id, "type": meta.get("type")})
+            # skip readme fetch if name matched
+            continue
 
-    # zero regex matches
-    if len(matching_artifacts) == 0:
+        # only attempt README search for GitHub or Hugging Face model/dataset URLs
+        try:
+            if url and ("github.com" in url or "huggingface.co" in url):
+                # GitHub: use our route_util helper which validates and fetches the README
+                if "github.com" in url:
+                    # use a short timeout for README fetches to avoid blocking
+                    valid, readme = get_github_readme(url, timeout=2)
+                    if valid and readme and pattern.search(readme):
+                        matching_artifacts.append({"name": name, "id": artifact_id, "type": meta.get("type")})
+                        continue
+
+                # Hugging Face: try to download README.md from the repo
+                if "huggingface.co" in url:
+                    parsed = parse_artifact_url(url)
+                    repo_id = getattr(parsed, "repo_id", None)
+                    if repo_id and (is_model_url(url) or is_dataset_url(url)):
+                        try:
+                            repo_type = "model" if is_model_url(url) else "dataset"
+                            local_readme = hf_client._api.hf_hub_download(repo_id=repo_id, filename="README.md", repo_type=repo_type)
+                            with open(local_readme, "r", encoding="utf-8", errors="replace") as f:
+                                readme = f.read()
+                            if readme and pattern.search(readme):
+                                matching_artifacts.append({"name": name, "id": artifact_id, "type": meta.get("type")})
+                                continue
+                        except Exception:
+                            # ignore any HF read errors and continue
+                            pass
+
+        except Exception:
+            # tolerate any unexpected per-artifact errors
+            pass
+
+        # support timeout of 2 seconds to ensure regex search does not hang
+        if time.monotonic() - start_time > 2:
+            return Response(status_code=400)
+
+    # return results
+    if not matching_artifacts:
         return Response(status_code=404)
-    else: # nonzero regex matches
-        return JSONResponse(content=matching_artifacts, status_code=200)
+    return JSONResponse(content=matching_artifacts, status_code=200)
 
 # license check of model against github project 
 @router.post("/artifact/model/{id}/license-check/")
