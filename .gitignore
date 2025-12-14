@@ -37,3 +37,4 @@ venv
 *.env.example
 *.env.local
 *.env.staging
+.env
