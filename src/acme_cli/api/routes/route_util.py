@@ -17,7 +17,7 @@ HEADERS = {
 # detects if a string is a single url of valid format and http(s)
 def validate_url_string(url: str) -> bool:
     url = url.strip()
-    matches = re.findall(URL_REGEX) 
+    matches = re.findall(URL_REGEX, url) 
     if len(matches) == 0 or len(matches) > 1:
         return False 
     else:
