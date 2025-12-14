@@ -213,7 +213,7 @@ async def reset_registry():
     return Response(status_code=200)
 
 # get specific artifact
-@router.get("/artifact/{artifact_type}/{id}")
+@router.get("/artifacts/{artifact_type}/{id}")
 async def get_artifact(artifact_type: str, id: int):
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
@@ -230,7 +230,7 @@ async def get_artifact(artifact_type: str, id: int):
     return JSONResponse(content=artifact, status_code=200)
 
 # update specific artifact
-@router.put("/artifact/{artifact_type}/{id}")
+@router.put("/artifacts/{artifact_type}/{id}")
 async def update_artifact(artifact_type: str, id: str, request: UpdateArtifactRequest):
     artifact_metadata = request.metadata
     artifact_data = request.data 
