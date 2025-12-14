@@ -66,14 +66,37 @@ def download_artifact_from_hf(url: str, artifact_id: str) -> str:
 
         # Download based on artifact type
         if is_model_url(url):
-            # Download model repository
-            repo_path = hf_client.snapshot_download(parsed_url.repo_id, cache_dir=temp_dir)
-            # Create archive of the downloaded content
-            import shutil
-            shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
+            # Prefer downloading just the model weights (a single large file)
+            # instead of snapshotting the whole repository which can be large.
+            repo_id = parsed_url.repo_id
+            model_info = hf_client.get_model(repo_id)
+            downloaded = None
+            if model_info and getattr(model_info, "files", None):
+                preferred = hf_client.choose_preferred_file(model_info.files)
+                if preferred:
+                    downloaded = hf_client.hf_hub_download(repo_id=repo_id, filename=preferred, repo_type="model", cache_dir=temp_dir)
+
+            # Fallback to full repo snapshot if single-file download failed
+            if not downloaded:
+                repo_path = hf_client.snapshot_download(parsed_url.repo_id, cache_dir=temp_dir)
+                if not repo_path:
+                    raise ValueError(f"Failed to download model repository: {parsed_url.repo_id}")
+                import shutil
+                shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
+            else:
+                # Archive just the single downloaded file
+                import shutil
+                file_dir = os.path.dirname(downloaded)
+                file_name = os.path.basename(downloaded)
+                shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', root_dir=file_dir, base_dir=file_name)
         elif is_dataset_url(url):
             # Download dataset
             repo_path = hf_client.snapshot_download(parsed_url.repo_id, repo_type="dataset", cache_dir=temp_dir)
+            if not repo_path:
+                raise ValueError(
+                    f"Failed to download dataset repository '{parsed_url.repo_id}'. "
+                    "Check HF API token, network access, and that the repo exists."
+                )
             import shutil
             shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
         else:
