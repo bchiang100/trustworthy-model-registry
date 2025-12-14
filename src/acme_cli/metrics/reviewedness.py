@@ -38,42 +38,48 @@ class GitHubClient:
 
     def get_pull_requests(self, owner: str, repo: str, state: str = "closed") -> list[dict]:
         """Get merged pull requests from a repository.
-        
+
+        Optimized to fetch fewer PRs and stop early to avoid rate limiting.
+
         Args:
             owner: Repository owner
             repo: Repository name
             state: PR state ("closed" for merged, "open", "all")
-            
+
         Returns:
-            List of PR objects from the GitHub API
+            List of PR objects from the GitHub API (limited to recent PRs)
         """
         try:
             session = self._get_session()
             url = f"{self._api_url}/repos/{owner}/{repo}/pulls"
             params = {
                 "state": state,
-                "per_page": 100,  # Paginate as needed
+                "per_page": 100,  # Max per page
+                "sort": "updated",  # Get most recently updated PRs
+                "direction": "desc",  # Most recent first
             }
-            
+
             all_prs = []
             page = 1
-            while True:
+            max_pages = 3  # Limit to first 300 PRs to avoid rate limiting
+
+            while page <= max_pages:
                 params["page"] = page
                 response = session.get(url, params=params, timeout=10)
                 response.raise_for_status()
                 prs = response.json()
-                
+
                 if not prs:
                     break
-                    
+
                 all_prs.extend(prs)
-                
-                # Stop after reasonable limit to avoid rate limits
-                if len(all_prs) >= 1000:
-                    break
-                    
                 page += 1
-            
+
+                # Early termination if we hit rate limits or get enough data
+                if len(all_prs) >= 200:  # Reasonable sample size
+                    break
+
+            logger.debug(f"Fetched {len(all_prs)} PRs for {owner}/{repo}")
             return all_prs
         except Exception as e:
             logger.warning(f"Failed to fetch PRs for {owner}/{repo}: {e}")
@@ -120,11 +126,11 @@ class GitHubClient:
 
     def get_repository_stats(self, owner: str, repo: str) -> Optional[dict]:
         """Get basic repository stats (language breakdown, size, etc).
-        
+
         Args:
             owner: Repository owner
             repo: Repository name
-            
+
         Returns:
             Repository info dict or None on error
         """
@@ -136,6 +142,27 @@ class GitHubClient:
             return response.json()
         except Exception as e:
             logger.warning(f"Failed to fetch repo stats for {owner}/{repo}: {e}")
+            return None
+
+    def _get_detailed_pr(self, owner: str, repo: str, pr_number: int) -> Optional[dict]:
+        """Get detailed PR information including review comments, commits count, etc.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            pr_number: Pull request number
+
+        Returns:
+            Detailed PR dict or None on error
+        """
+        try:
+            session = self._get_session()
+            url = f"{self._api_url}/repos/{owner}/{repo}/pulls/{pr_number}"
+            response = session.get(url, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.debug(f"Failed to fetch detailed PR #{pr_number}: {e}")
             return None
 
 
@@ -218,60 +245,99 @@ class ReviewednessMetric(Metric):
 
     def _compute_repo_score(self, owner: str, repo: str) -> float:
         """Compute reviewedness score for a single repository.
-        
+
         Args:
             owner: Repository owner
             repo: Repository name
-            
+
         Returns:
             Score between 0.0 and 1.0
         """
         try:
-            # Get merged PRs with code review
+            # Get recent merged PRs (limit to avoid rate limiting)
             prs = self.client.get_pull_requests(owner, repo, state="closed")
-            
+
             if not prs:
                 logger.warning(f"No PRs found for {owner}/{repo}")
                 return 0.0
 
-            # Count PRs with reviews
-            reviewed_prs = 0
-            reviewed_commits = 0
-            total_commits = 0
+            sample_prs = prs[:50] if len(prs) > 50 else prs
 
-            for pr in prs:
+            # Count PRs with reviews vs total PRs
+            reviewed_prs = 0
+            total_analyzed_prs = 0
+
+            for pr in sample_prs:
                 # Check if PR was actually merged (in closed state, some may just be closed)
                 if not pr.get("merged_at"):
                     continue
 
-                # Count this PR's commits
-                commits = self.client.get_commits_by_pr(owner, repo, pr["number"])
-                pr_commit_count = len(commits)
-                total_commits += pr_commit_count
+                total_analyzed_prs += 1
 
-                # Check if PR has reviews
-                # A PR with reviews will have review_comments > 0 or was approved
-                has_review = (
-                    pr.get("review_comments", 0) > 0 
-                    or pr.get("requested_reviewers", [])
-                    or pr.get("reviews_count", 0) > 0
-                )
+                # Fetch detailed PR data if basic data is missing
+                detailed_pr = self.client._get_detailed_pr(owner, repo, pr.get('number', 0))
+                if detailed_pr:
+                    pr = detailed_pr
+
+                # Check if PR has code reviews (more comprehensive check)
+                has_review = self._pr_has_code_review(pr)
+
+                # Debug logging for PR analysis
+                logger.debug(f"PR #{pr.get('number')}: review_comments={pr.get('review_comments', 0)}, "
+                           f"comments={pr.get('comments', 0)}, commits={pr.get('commits', 0)}, "
+                           f"author={pr.get('user', {}).get('login', '')}, "
+                           f"merged_by={pr.get('merged_by', {}).get('login', '')}, "
+                           f"has_review={has_review}")
 
                 if has_review:
                     reviewed_prs += 1
-                    reviewed_commits += pr_commit_count
 
-            if total_commits == 0:
-                logger.warning(f"No commits found in merged PRs for {owner}/{repo}")
+            if total_analyzed_prs == 0:
+                logger.warning(f"No merged PRs found for analysis in {owner}/{repo}")
                 return 0.0
 
-            # Return fraction of commits that went through review
-            score = reviewed_commits / total_commits
+            # Return fraction of PRs that went through code review
+            score = reviewed_prs / total_analyzed_prs
+            logger.debug(f"Reviewedness for {owner}/{repo}: {reviewed_prs}/{total_analyzed_prs} = {score:.3f}")
             return score
 
         except Exception as e:
             logger.error(f"Error computing reviewedness for {owner}/{repo}: {e}")
             return 0.0
+
+    def _pr_has_code_review(self, pr: dict) -> bool:
+        """Check if a PR has evidence of code review.
+
+        Args:
+            pr: Pull request data from GitHub API
+
+        Returns:
+            bool: True if PR shows evidence of code review
+        """
+        # Multiple indicators of code review:
+        # 1. Review comments on the PR
+        if pr.get("review_comments", 0) > 0:
+            return True
+
+        # 2. General comments (may indicate review discussion)
+        if pr.get("comments", 0) > 1:  # More than just the initial comment
+            return True
+
+        # 3. Multiple commits (may indicate review feedback addressed)
+        if pr.get("commits", 0) > 1:
+            return True
+
+        # 4. PR was not merged by the author (indicates review by someone else)
+        author = pr.get("user", {}).get("login", "")
+        merged_by = pr.get("merged_by", {})
+        if merged_by and merged_by.get("login", "") != author:
+            return True
+
+        # 5. PR has requested reviewers
+        if pr.get("requested_reviewers", []):
+            return True
+
+        return False
 
 
 __all__ = ["ReviewednessMetric", "GitHubClient"]
