@@ -21,6 +21,7 @@ from acme_cli.urls import parse_artifact_url, is_code_url, is_dataset_url, is_mo
 from acme_cli.hf.client import HfClient
 from .route_util import validate_url_string, get_github_readme, make_id
 import hashlib
+from acme_cli.llm import LlmEvaluator
 
 
 
@@ -428,16 +429,69 @@ async def check_license(id: str, request: LicenseCheckRequest) -> JSONResponse:
     valid, readme = get_github_readme(project_url)
     if not valid:
         return Response(status_code=404)
-    # if no license, return 502
-    project_has_license = readme.lower().find("license") != -1
-    if not project_has_license:
+
+    # simple license detection helper (naive)
+    def _detect_license(text: str) -> str | None:
+        if not text:
+            return None
+        # look for common SPDX identifiers or license names
+        m = re.search(r"(Apache-2\.0|Apache License|MIT License|MIT|BSD-3-Clause|BSD|GPL-3\.0|GPL|LGPL)", text, re.I)
+        return m.group(0) if m else None
+
+    project_license = _detect_license(readme)
+    if not project_license:
+        # no explicit license text found in README
         return Response(status_code=502)
-    # use llm to determine whether the project can use the model for fine tuning and inference
-    license_compatible = True
-    if not license_compatible:
-        return JSONResponse(content="false", status_code=200)
-    # return status as true or false in json 
-    return JSONResponse(content="true", status_code=200)
+
+    # parse license from model on Hugging Face
+    meta = artifacts_metadata.get(id)
+    model_license: str | None = None
+    if meta:
+        model_url = meta.get("url")
+        parsed = parse_artifact_url(model_url) if model_url else None
+        repo_id = getattr(parsed, "repo_id", None) if parsed else None
+        if repo_id:
+            # try structured metadata first
+            info = hf_client.get_model(repo_id)
+            if info and getattr(info, "card_data", None):
+                model_license = info.card_data.get("license") or info.card_data.get("License")
+
+            # fallback: try to read LICENSE file from repo
+            if not model_license:
+                for fname in ("LICENSE", "LICENSE.md", "LICENSE.txt", "license", "license.md"):
+                    try:
+                        path = hf_client._api.hf_hub_download(repo_id=repo_id, filename=fname, repo_type="model")
+                        if path:
+                            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                                content = fh.read()
+                            ml = _detect_license(content)
+                            if ml:
+                                model_license = ml
+                                break
+                    except Exception:
+                        continue
+
+    # determine compatibility using the LLM; fall back to False on errors
+    license_compatible = None
+    if project_license and model_license:
+        try:
+            evaluator = LlmEvaluator()
+            license_compatible = evaluator.judge_license_compatibility(
+                project_license, model_license
+            )
+        except Exception:
+            # Any LLM errors are considered non-compatible by default
+            license_compatible = False
+
+    return JSONResponse(
+        content={
+            "project_has_license": True,
+            "project_license": project_license,
+            "model_license": model_license,
+            "license_compatible": license_compatible,
+        },
+        status_code=200,
+    )
 
 # get lineage graph of model, refer to evan's metric generation for that 
 @router.post("/artifact/model/{id}/lineage/")
