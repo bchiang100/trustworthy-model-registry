@@ -253,7 +253,7 @@ async def update_artifact(artifact_type: str, id: str, request: UpdateArtifactRe
     return Response(status_code=200)
 
 # ingest artifact
-@router.put("/artifact/{artifact_type}")
+@router.post("/artifact/{artifact_type}")
 async def ingest_artifact(artifact_type: str, request: IngestRequest):
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
