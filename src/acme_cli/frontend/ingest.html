@@ -17,17 +17,20 @@
       <a href="enumerate.html">Enumerate / Search</a>
     </nav>
   </header>
-  <main>
-  <section class="card stacked">
-      <h2>Ingest URL</h2>
+  <main role="main">
+    <section class="card stacked" aria-labelledby="ingest-title">
+      <h2 id="ingest-title">Ingest URL</h2>
       <p class="muted">Provide a Hugging Face model URL (e.g. https://huggingface.co/author/model) to start ingestion via the backend. The API will validate Hugging Face URLs.</p>
-      <form onsubmit="event.preventDefault(); doIngest(this)">
-        <label>Hugging Face model URL</label>
-        <input name="url" type="url" placeholder="https://huggingface.co/author/model-name" />
-        <label>Threshold (0–1)</label>
-        <input name="threshold" type="text" value="0.5" />
+      <form id="ingest-form" onsubmit="event.preventDefault(); doIngest(this)">
+        <label for="ingest-name">Model name</label>
+        <input id="ingest-name" name="name" type="text" placeholder="optional human-friendly name" aria-label="Model name" />
+
+        <label for="ingest-url">Hugging Face model URL</label>
+        <input id="ingest-url" name="url" type="url" placeholder="https://huggingface.co/author/model-name" aria-required="true" required />
+
         <div style="margin-top:12px"><button type="submit">Start ingest</button></div>
       </form>
+      <div id="ingest-result" aria-live="polite" style="margin-top:12px"></div>
     </section>
   </main>
   <script src="app.js"></script>

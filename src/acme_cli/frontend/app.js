@@ -5,11 +5,11 @@ const API_BASE = 'http://127.0.0.1:8000/api/v1';
 
 function escapeHtml(s){ return String(s).replace(/[&<>\"]/g, c=>'&'+{'&':'amp','<':'lt','>':'gt','"':'quot'}[c]+';') }
 
-async function fetchModels(search){
+// List models via POST /artifacts with a special wildcard query
+async function fetchModels(){
   try{
-    let url = `${API_BASE}/models`;
-    if(search) url += `?search=${encodeURIComponent(search)}`;
-    const res = await fetch(url);
+    const body = [{ name: '*', types: ['model'] }];
+    const res = await fetch(`${API_BASE}/artifacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if(!res.ok) throw new Error(`Failed to list models: ${res.status}`);
     return await res.json();
   }catch(err){
@@ -84,11 +84,6 @@ async function uploadModel(form){
   }
 }
 
-// Rating and delete are not implemented in API v0.1 - keep local fallbacks
-function submitRating(id, value){
-  // No rating endpoint in API v0.1; provide a client-side acknowledgement
-  alert('Rating submitted (local mock) — API does not support ratings yet.');
-}
 
 function deleteModel(id){
   // No delete endpoint in API v0.1; fallback to notifying user
@@ -97,23 +92,31 @@ function deleteModel(id){
   window.location.href='index.html';
 }
 
-// Ingest via the API - sends a POST with huggingface_url query param
+// Ingest via the API - POST /artifact/model with JSON body {name, url}
 async function doIngest(form){
   const url = form.url.value.trim();
+  let name = (form.name && form.name.value && form.name.value.trim()) || '';
   const threshold = Number(form.threshold?.value || 0);
-  if(!url) return alert('url required');
+  if(!url) return alert('URL required');
+  if(!name){
+    // derive a simple name from the repo path
+    try{ name = url.split('/').slice(-1)[0] || url; }catch(e){ name = url }
+  }
+  const payload = { name: name, url: url };
+  const resultEl = document.getElementById('ingest-result');
   try{
-    const res = await fetch(`${API_BASE}/models/ingest?huggingface_url=${encodeURIComponent(url)}`, { method: 'POST' });
+    const res = await fetch(`${API_BASE}/artifact/model`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if(!res.ok){
       const txt = await res.text(); throw new Error(txt||res.statusText);
     }
     const data = await res.json();
-    const msg = `Ingest started. Estimated name: ${data.estimated_model_name || 'unknown'}. Status: ${data.status}`;
-    alert(msg);
-    // In real flow, backend would process and then the model would appear in listing
+    const msg = `Ingest started (id: ${data?.metadata?.id || data?.data?.id || 'unknown'}).`;
+    if(resultEl) resultEl.textContent = msg;
+    else alert(msg);
   }catch(err){
     console.error('doIngest error', err);
-    alert('Ingest failed: ' + (err.message||err));
+    if(resultEl) resultEl.textContent = 'Ingest failed: ' + (err.message||err);
+    else alert('Ingest failed: ' + (err.message||err));
   }
 }
 
@@ -139,23 +142,45 @@ function performLicenseCheck(form){
   alert(ok? 'Compatible — OK to use in project.':'Not compatible — do not use without legal review.');
 }
 
-// Enumerate / regex search via API 'search' query
-async function enumerateSearch(term, containerId){
-  const container = document.getElementById(containerId);
+// Regex search via POST /artifact/byRegEx
+async function doRegexSearch(){
+  const term = document.getElementById('q').value.trim();
+  const container = document.getElementById('results');
   if(!container) return;
+  if(!term) { container.innerHTML = '<p class="muted">Enter a regex</p>'; return; }
   try{
-    const list = await fetchModels(term);
-    if(!list || list.length===0) container.innerHTML = '<p class="muted">No results</p>';
-    else container.innerHTML = list.map(m=>{
-      const name = m.metadata?.name || m.name || m.id;
-      const desc = m.metadata?.description || m.desc || '';
-      const license = (typeof m.metadata?.license === 'string' ? m.metadata.license : (m.license||'')).toString();
-      const rating = m.metadata?.net_score ?? m.rating ?? 0;
-      return `<div class="card"><div style="flex:1"><h3>${escapeHtml(name)}</h3><p>${escapeHtml(desc)}</p><p><small class="muted">license:${escapeHtml(license)} • score:${Number(rating).toFixed(2)}</small></p></div><div><a href="model.html?id=${encodeURIComponent(m.id)}"><button>View</button></a></div></div>`
-    }).join('');
-  }catch(e){
-    container.innerHTML = '<p class="muted">Search failed</p>';
-  }
+    const res = await fetch(`${API_BASE}/artifact/byRegEx`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ regex: term }) });
+    if(res.status === 404){ container.innerHTML = '<p class="muted">No results</p>'; return; }
+    if(!res.ok) throw new Error('Search failed');
+    const list = await res.json();
+    container.innerHTML = list.map(m=>`<div class="card"><div style="flex:1"><h3>${escapeHtml(m.name)}</h3><p><small class="muted">id: ${escapeHtml(String(m.id))} • type: ${escapeHtml(String(m.type))}</small></p></div><div><a href="model.html?id=${encodeURIComponent(m.id)}"><button>View</button></a></div></div>`).join('');
+  }catch(e){ console.error('doRegexSearch', e); container.innerHTML = '<p class="muted">Search failed</p>'; }
+}
+
+// Search by artifact id via GET /artifacts/{type}/{id}
+async function doIdSearch(){
+  const type = document.getElementById('artifact-type').value;
+  const id = document.getElementById('artifact-id').value.trim();
+  const el = document.getElementById('id-result');
+  if(!id) { if(el) el.innerHTML = '<p class="muted">Enter an id</p>'; return; }
+  try{
+    const res = await fetch(`${API_BASE}/artifacts/${encodeURIComponent(type)}/${encodeURIComponent(id)}`);
+    if(res.status === 404){ if(el) el.innerHTML = '<p class="muted">Not found</p>'; return; }
+    if(!res.ok) throw new Error('Lookup failed');
+    const d = await res.json();
+    if(el) el.innerHTML = `<div class="card"><h3>${escapeHtml(d.metadata.name)}</h3><p>Type: ${escapeHtml(d.metadata.type)}</p><p>URL: <a href="${escapeHtml(d.data.url)}">${escapeHtml(d.data.url)}</a></p></div>`;
+  }catch(e){ console.error('doIdSearch', e); if(el) el.innerHTML = '<p class="muted">Lookup failed</p>'; }
+}
+
+// Reset registry via DELETE /reset
+async function doReset(){
+  if(!confirm('Reset registry? This will remove all in-memory metadata and may delete objects in S3.')) return;
+  try{
+    const res = await fetch(`${API_BASE}/reset`, { method: 'DELETE' });
+    if(!res.ok) throw new Error('Reset failed');
+    alert('Registry reset');
+    renderList('model-list');
+  }catch(e){ console.error('doReset', e); alert('Reset failed: ' + (e.message||e)); }
 }
 
 // On index load, render list from API

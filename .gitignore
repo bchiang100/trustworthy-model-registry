@@ -33,6 +33,8 @@ htmlcov
 venv
 
 # Ignore environment files
+*.env
+*.env.example
+*.env.local
+*.env.staging
 .env
-.env.local
-.env.*.local

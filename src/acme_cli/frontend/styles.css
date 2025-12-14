@@ -20,6 +20,7 @@ header {
 header h1 { margin: 0; font-size: 18px; }
 nav a { color: #fff; margin-left: 12px; text-decoration: none; padding: 6px 8px; border-radius: 6px }
 nav a:hover { background: rgba(255,255,255,0.12) }
+nav a:focus-visible, button:focus-visible { outline: 3px solid #ffd54f; outline-offset: 2px }
 
 /* Main container is wider and centered so cards look larger for screenshots */
 main { padding: 28px; max-width: 1100px; margin: 20px auto }
@@ -50,6 +51,7 @@ section.intro { background: #fff; padding: 16px; border-radius: 8px; box-shadow:
 .card p { margin: 0; color: #444 }
 
 button { background: #0b5fff; color: #fff; border: 0; padding: 8px 10px; border-radius: 6px; cursor: pointer }
+button:focus { box-shadow: 0 0 0 3px rgba(11,95,255,0.12) }
 button.secondary { background: #e5e7ef; color: #0b1033 }
 button.ghost { background: transparent; border: 1px solid #d7d9e6; color: #0b1033 }
 
@@ -58,6 +60,7 @@ small.muted { color: #6b7280 }
 
 /* Inputs fill available space; .row sets a larger second column for inputs + buttons */
 input[type=text], input[type=url], textarea, select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #d7d9e6; background: #fff }
+input:focus, textarea:focus, select:focus { outline: 3px solid #ffd54f; outline-offset: 2px }
 label { font-weight: 600; display: block; margin: 10px 0 6px }
 .row { display: grid; grid-template-columns: 1fr 220px; gap: 12px; align-items: end }
 
@@ -65,3 +68,6 @@ label { font-weight: 600; display: block; margin: 10px 0 6px }
 #model-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px; justify-items: center }
 
 footer { padding: 12px; text-align: center; color: #6b7280; font-size: 13px; margin-top: 30px }
+
+/* Utility for screen-reader-only text */
+.visually-hidden { position: absolute !important; height: 1px; width: 1px; overflow: hidden; clip: rect(1px, 1px, 1px, 1px); white-space: nowrap }

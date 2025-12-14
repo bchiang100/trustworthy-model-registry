@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 # S3 config
-S3_BUCKET_NAME = os.getenv("ACME_S3_BUCKET", "acme-model-registry")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+S3_BUCKET_NAME = "461-model-registry-ui"
+AWS_REGION = "us-east-2"
 
 # initialize the S3 client
 s3_client = boto3.client('s3', region_name=AWS_REGION)
@@ -47,12 +47,8 @@ def upload_to_s3(local_file_path: str, s3_key: str) -> str:
     """Upload file to S3 and return download URL."""
     try:
         s3_client.upload_file(local_file_path, S3_BUCKET_NAME, s3_key)
-        # generates download URL
-        download_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': S3_BUCKET_NAME, 'Key': s3_key},
-            ExpiresIn=3600
-        )
+        # download url is determinstic 
+        download_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
         return download_url
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"S3 upload failed: {str(e)}")
@@ -70,14 +66,37 @@ def download_artifact_from_hf(url: str, artifact_id: str) -> str:
 
         # Download based on artifact type
         if is_model_url(url):
-            # Download model repository
-            repo_path = hf_client.snapshot_download(parsed_url.repo_id, cache_dir=temp_dir)
-            # Create archive of the downloaded content
-            import shutil
-            shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
+            # Prefer downloading just the model weights (a single large file)
+            # instead of snapshotting the whole repository which can be large.
+            repo_id = parsed_url.repo_id
+            model_info = hf_client.get_model(repo_id)
+            downloaded = None
+            if model_info and getattr(model_info, "files", None):
+                preferred = hf_client.choose_preferred_file(model_info.files)
+                if preferred:
+                    downloaded = hf_client.hf_hub_download(repo_id=repo_id, filename=preferred, repo_type="model", cache_dir=temp_dir)
+
+            # Fallback to full repo snapshot if single-file download failed
+            if not downloaded:
+                repo_path = hf_client.snapshot_download(parsed_url.repo_id, cache_dir=temp_dir)
+                if not repo_path:
+                    raise ValueError(f"Failed to download model repository: {parsed_url.repo_id}")
+                import shutil
+                shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
+            else:
+                # Archive just the single downloaded file
+                import shutil
+                file_dir = os.path.dirname(downloaded)
+                file_name = os.path.basename(downloaded)
+                shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', root_dir=file_dir, base_dir=file_name)
         elif is_dataset_url(url):
             # Download dataset
             repo_path = hf_client.snapshot_download(parsed_url.repo_id, repo_type="dataset", cache_dir=temp_dir)
+            if not repo_path:
+                raise ValueError(
+                    f"Failed to download dataset repository '{parsed_url.repo_id}'. "
+                    "Check HF API token, network access, and that the repo exists."
+                )
             import shutil
             shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
         else:
@@ -209,7 +228,18 @@ async def reset_registry():
     artifacts_metadata.clear()
     artifact_ids.clear()
     artifact_name_to_id.clear()
-    # TODO: implement logic to batch enumerate from s3 and delete
+
+    # clears data in s3 bucket
+    paginator = s3_client.get_paginator('list_objects_v2')
+    pages = paginator.paginate(Bucket=S3_BUCKET_NAME)
+
+    for page in pages:
+        if 'Contents' in page:
+            objects_to_delete = [{'Key': obj['Key']} for obj in page['Contents']]
+            s3_client.delete_objects(
+                Bucket=S3_BUCKET_NAME,
+                Delete={'Objects': objects_to_delete}
+            )
     return Response(status_code=200)
 
 # get specific artifact
@@ -225,7 +255,7 @@ async def get_artifact(artifact_type: str, id: int):
     name = artifacts_metadata[id]["name"]
     url = artifacts_metadata[id]["url"]
     metadata = {"name": name, "id": id, "type": artifact_type}
-    data = {"url": url}
+    data = {"url": url, "download_url": artifacts_metadata[id]["download_url"]}
     artifact = {"metadata": metadata, "data": data}
     return JSONResponse(content=artifact, status_code=200)
 
@@ -353,18 +383,66 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
     if rating >= 0.2: # trustworthy
         try:
             # download artifact from huggingface
-            # local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
+            local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
 
             # creates S3 key for the artifact
-            # s3_key = f"{artifact_type}/{id}/.tar.gz"
+            s3_key = f"{artifact_type}/{id}/.tar.gz"
 
             # upload to S3 and get download URL
-            # download_url = upload_to_s3(local_file_path, s3_key)
+            download_url = upload_to_s3(local_file_path, s3_key)
 
-            # Clean up local file
-            # import os
-            # os.remove(local_file_path)
-            # os.rmdir(os.path.dirname(local_file_path))
+            # Clean up local file and temporary directory. Use recursive removal
+            # because HF downloads or intermediate tooling may leave extra files
+            # (e.g., cache dirs) in the temporary directory which prevents
+            # `os.rmdir` from succeeding.
+            import os
+            import shutil
+            try:
+                if os.path.exists(local_file_path):
+                    os.remove(local_file_path)
+            except Exception:
+                # best-effort cleanup; do not fail the request because of cleanup
+                pass
+            try:
+                def _on_rm_error(func, path, exc_info):
+                    # try to make writable and retry
+                    try:
+                        os.chmod(path, 0o700)
+                    except Exception:
+                        pass
+                    try:
+                        func(path)
+                    except Exception:
+                        pass
+
+                shutil.rmtree(os.path.dirname(local_file_path), onerror=_on_rm_error)
+            except Exception:
+                # as a final fallback, attempt to remove files then the dir
+                try:
+                    for root, dirs, files in os.walk(os.path.dirname(local_file_path), topdown=False):
+                        for name in files:
+                            try:
+                                os.chmod(os.path.join(root, name), 0o600)
+                                os.remove(os.path.join(root, name))
+                            except Exception:
+                                pass
+                        for name in dirs:
+                            try:
+                                os.rmdir(os.path.join(root, name))
+                            except Exception:
+                                pass
+                    try:
+                        os.rmdir(os.path.dirname(local_file_path))
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            # If the temp dir still exists, log a warning for diagnostics
+            try:
+                if os.path.exists(os.path.dirname(local_file_path)):
+                    logger.warning("Temp dir still exists after cleanup: %s", os.path.dirname(local_file_path))
+            except Exception:
+                pass
 
 
             # store metadata in memory
@@ -372,7 +450,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
                 "name": artifact_name,
                 "type": artifact_type,
                 "url": artifact_url,
-                # "download_url": download_url,
+                "download_url": download_url,
                 # "s3_key": s3_key
             }
             artifact_ids.append(id)
@@ -391,7 +469,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
                     },
                     "data": {
                         "url": artifact_url,
-                        # "download_url": download_url
+                        "download_url": download_url
                     }
                 },
                 status_code=201
@@ -399,7 +477,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
         
         except Exception as e:
             # If S3 upload fails, return 500
-            raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"S3 Upload failed: {str(e)}")
     else:
         # if rating fails, return 424
         return Response(status_code=424)

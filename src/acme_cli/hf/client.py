@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable, Optional
 
-from huggingface_hub import HfApi
+from huggingface_hub import HfApi, snapshot_download
 from huggingface_hub.hf_api import DatasetInfo, ModelInfo, RepoFile
 
 from acme_cli.types import DatasetMetadata, ModelMetadata
@@ -138,6 +138,74 @@ class HfClient:
         except Exception:  # noqa: BLE001
             return []
         return list(files)
+
+    def choose_preferred_file(self, files: list[RepoFile]) -> str | None:
+        """Choose the best candidate file to download from a repo.
+
+        Preference is given to known model weight extensions and filenames
+        (e.g., 'pytorch_model.bin', '.safetensors', 'flax_model.msgpack'),
+        otherwise the largest file is chosen.
+        """
+        if not files:
+            return None
+
+        preferred_patterns = [
+            "pytorch_model.bin",
+            ".safetensors",
+            "flax_model.msgpack",
+            ".msgpack",
+            ".bin",
+            ".pt",
+            ".ckpt",
+            ".h5",
+            ".onnx",
+        ]
+
+        # match any preferred patterns
+        matches = [f for f in files if any(p in f.path for p in preferred_patterns)]
+        candidates = matches if matches else files
+
+        # choose the file with largest size (None treated as 0)
+        best = max(candidates, key=lambda f: (f.size_bytes or 0))
+        return best.path
+
+    def hf_hub_download(self, repo_id: str, filename: str, repo_type: str = "model", cache_dir: Optional[str] = None) -> str | None:
+        """Download a single file from a repo and return the local path.
+
+        Returns `None` on failure instead of raising to allow callers to
+        gracefully fallback to other download strategies.
+        """
+        try:
+            from huggingface_hub import hf_hub_download
+
+            path = hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                repo_type=repo_type,
+                cache_dir=cache_dir,
+                token=(self._api.token if hasattr(self._api, "token") else None),
+            )
+            return path
+        except Exception:  # noqa: BLE001
+            return None
+
+    def snapshot_download(self, repo_id: str, repo_type: str = "model", cache_dir: Optional[str] = None) -> str | None:
+        """Download a snapshot of the repo and return the local path to it.
+
+        Wraps `huggingface_hub.snapshot_download` and forwards the client's
+        token. Returns `None` on failure to allow callers to handle errors
+        without raising during diagnostic runs.
+        """
+        try:
+            path = snapshot_download(
+                repo_id,
+                repo_type=repo_type,
+                cache_dir=cache_dir,
+                token=(self._api.token if hasattr(self._api, "token") else None),
+            )
+            return path
+        except Exception:  # noqa: BLE001
+            return None
 
 
 __all__ = ["HfClient", "HuggingFaceConfig"]
