@@ -174,7 +174,8 @@ async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
     pagination_offset: int = int(offset)
 
     # enumerate all artifacts in the registry metadata up to pagination size or end of registry
-    if len(request) == 0 and request[0].name == "":
+    if len(request) == 0:
+        artifacts = []
         for id in artifact_ids[pagination_offset:min(pagination_offset+PAGINATION_SIZE, len(artifacts_metadata))]:
             name = artifacts_metadata[id]["name"]
             type = artifacts_metadata[id]["type"]
