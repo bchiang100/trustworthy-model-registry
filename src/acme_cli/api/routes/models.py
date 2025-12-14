@@ -255,7 +255,7 @@ async def get_artifact(artifact_type: str, id: int):
     name = artifacts_metadata[id]["name"]
     url = artifacts_metadata[id]["url"]
     metadata = {"name": name, "id": id, "type": artifact_type}
-    data = {"url": url}
+    data = {"url": url, "download_url": artifacts_metadata[id]["download_url"]}
     artifact = {"metadata": metadata, "data": data}
     return JSONResponse(content=artifact, status_code=200)
 
