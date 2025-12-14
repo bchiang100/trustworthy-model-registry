@@ -469,7 +469,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
                     },
                     "data": {
                         "url": artifact_url,
-                        # "download_url": download_url
+                        "download_url": download_url
                     }
                 },
                 status_code=201

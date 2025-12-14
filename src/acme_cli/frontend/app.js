@@ -84,11 +84,6 @@ async function uploadModel(form){
   }
 }
 
-// Rating and delete are not implemented in API v0.1 - keep local fallbacks
-function submitRating(id, value){
-  // No rating endpoint in API v0.1; provide a client-side acknowledgement
-  alert('Rating submitted (local mock) — API does not support ratings yet.');
-}
 
 function deleteModel(id){
   // No delete endpoint in API v0.1; fallback to notifying user
