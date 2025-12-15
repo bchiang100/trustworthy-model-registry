@@ -28,8 +28,10 @@
 # - Recent logs: System events and API requests with timestamps
 # - Status indicators: Green = healthy, yellow = warning, red = error
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from acme_cli.api.middleware import MetricsMiddleware
 from acme_cli.api.routes import models, health
@@ -58,6 +60,15 @@ app.include_router(
     models.router, prefix="/api/v1", tags=["models"]
 )  # adds model endpoints
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    for err in exc.errors():
+        if err["loc"][0] == "path":
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Bad request: missing or invalid path parameter"}
+            )
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 @app.get("/")
 async def root():

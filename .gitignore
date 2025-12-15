@@ -27,6 +27,7 @@ dist
 # Ignore Python test files
 .pytest_cache
 .coverage
+coverage.xml
 htmlcov
 
 # Ignore Python virtual environment

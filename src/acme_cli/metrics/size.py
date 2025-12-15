@@ -40,7 +40,28 @@ class SizeMetric(Metric):
             total_bytes = self._get_hf_model_size(context)
 
         if total_bytes == 0:
-            return {key: 0.5 for key in _THRESHOLDS}  # worst case (if size unknown)
+            # Improved fallback logic based on model characteristics
+            model_url = context.target.model_url or ""
+            model_name = model_url.split("/")[-1].lower() if model_url else ""
+
+            # Smart fallback based on model naming patterns
+            if any(keyword in model_name for keyword in ["tiny", "small", "mini", "micro", "test"]):
+                # Assume small test models are ~100MB - good for all hardware
+                estimated_bytes = 100 * 1024 * 1024
+            elif any(keyword in model_name for keyword in ["base", "medium"]):
+                # Medium models ~1GB - good for jetson_nano and above
+                estimated_bytes = 1 * 1024 * 1024 * 1024
+            elif any(keyword in model_name for keyword in ["large", "xl"]):
+                # Large models ~5GB - good for desktop and servers
+                estimated_bytes = 5 * 1024 * 1024 * 1024
+            else:
+                # Unknown models - conservative estimate ~2GB
+                estimated_bytes = 2 * 1024 * 1024 * 1024
+
+            return {
+                hardware: self._hardware_score(estimated_bytes, limits)
+                for hardware, limits in _THRESHOLDS.items()
+            }
         return {
             hardware: self._hardware_score(total_bytes, limits)
             for hardware, limits in _THRESHOLDS.items()
@@ -98,7 +119,8 @@ class SizeMetric(Metric):
             api = HfApi()
 
             try:
-                model_info = api.model_info(model_id)
+                # Use repo_info with files_metadata=True to get actual file sizes (instead of api.model_info(model_id)) didnt include file sizes beforei
+                model_info = api.repo_info(model_id, files_metadata=True)
                 total_size = 0
 
                 for sibling in model_info.siblings:

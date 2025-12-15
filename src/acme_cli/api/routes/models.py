@@ -32,6 +32,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+
 # S3 config
 S3_BUCKET_NAME = "461-model-registry-ui"
 AWS_REGION = "us-east-2"
@@ -41,7 +42,7 @@ s3_client = boto3.client('s3', region_name=AWS_REGION)
 hf_client = HfClient()
 
 # other constants
-PAGINATION_SIZE = 10
+PAGINATION_SIZE = 50
 
 def upload_to_s3(local_file_path: str, s3_key: str) -> str:
     """Upload file to S3 and return download URL."""
@@ -178,7 +179,7 @@ class UpdateArtifactRequest(BaseModel):
 
 class QueryRequest(BaseModel):
     name: str 
-    types: List[str]  # "model", "dataset", "code"
+    types: List[str] | None # "model", "dataset", "code"
 
 
 ## SPEC COMPLIANT ENDPOINTS 
@@ -210,14 +211,11 @@ async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
         types = query.types
         for id in artifact_name_to_id.get(name, []):
             artifact = artifacts_metadata[id]
-            if artifact["type"] in types: 
+            if artifact["type"] in types or types == None: 
                 type = artifacts_metadata[id]["type"]
                 artifacts.append({"name": name, "id": id, "type": type})
     headers = {offset: str(pagination_offset + len(artifacts))}
 
-    # too many artifacts returned
-    if len(artifacts) > PAGINATION_SIZE:
-        return Response(status_code=413)
     # return artifact matches 
     return JSONResponse(content=artifacts, headers=headers, status_code=200)
 
@@ -244,7 +242,9 @@ async def reset_registry():
 
 # get specific artifact
 @router.get("/artifacts/{artifact_type}/{id}")
-async def get_artifact(artifact_type: str, id: int):
+async def get_artifact(artifact_type: str, id: int | None):
+    if id == None:
+        return Response(status_code=400)
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
     # check if id exists in the registry metadata db 
@@ -380,140 +380,140 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
     # create id
     id = int(make_id(artifact_url))
 
-    if rating >= 0.2: # trustworthy
+    # if rating >= 0: # trustworthy
+    try:
+        # attempt to stream a preferred single file directly to S3 to avoid
+        # persisting large files on the local EC2 instance. If streaming
+        # fails, fall back to the existing local download + upload flow.
+        s3_key = f"{artifact_type}/{id}/.tar.gz"
+        download_url = None
+        skip_local = False
+
         try:
-            # attempt to stream a preferred single file directly to S3 to avoid
-            # persisting large files on the local EC2 instance. If streaming
-            # fails, fall back to the existing local download + upload flow.
-            s3_key = f"{artifact_type}/{id}/.tar.gz"
-            download_url = None
-            skip_local = False
+            parsed = parse_artifact_url(artifact_url)
+            if parsed and is_model_url(artifact_url):
+                repo_id = parsed.repo_id
+                info = hf_client.get_model(repo_id)
+                preferred = hf_client.choose_preferred_file(info.files) if info else None
+                if preferred:
+                    ok = hf_client.stream_file_to_s3(
+                        repo_id=repo_id,
+                        filename=preferred,
+                        bucket=S3_BUCKET_NAME,
+                        key=s3_key,
+                        repo_type="model",
+                        s3_client=s3_client,
+                    )
+                    if ok:
+                        download_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
+                        skip_local = True
+        except Exception:
+            # non-fatal; fall back to local download path below
+            pass
 
-            try:
-                parsed = parse_artifact_url(artifact_url)
-                if parsed and is_model_url(artifact_url):
-                    repo_id = parsed.repo_id
-                    info = hf_client.get_model(repo_id)
-                    preferred = hf_client.choose_preferred_file(info.files) if info else None
-                    if preferred:
-                        ok = hf_client.stream_file_to_s3(
-                            repo_id=repo_id,
-                            filename=preferred,
-                            bucket=S3_BUCKET_NAME,
-                            key=s3_key,
-                            repo_type="model",
-                            s3_client=s3_client,
-                        )
-                        if ok:
-                            download_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
-                            skip_local = True
-            except Exception:
-                # non-fatal; fall back to local download path below
-                pass
+        if not skip_local:
+            # download artifact from huggingface (local filesystem)
+            local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
 
-            if not skip_local:
-                # download artifact from huggingface (local filesystem)
-                local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
+            # upload to S3 and get download URL
+            download_url = upload_to_s3(local_file_path, s3_key)
 
-                # upload to S3 and get download URL
-                download_url = upload_to_s3(local_file_path, s3_key)
-
-            # Clean up local file and temporary directory. Use recursive removal
-            # because HF downloads or intermediate tooling may leave extra files
-            # (e.g., cache dirs) in the temporary directory which prevents
-            # `os.rmdir` from succeeding.
-            import os
-            import shutil
-            try:
-                if os.path.exists(local_file_path):
-                    os.remove(local_file_path)
-            except Exception:
-                # best-effort cleanup; do not fail the request because of cleanup
-                pass
-            try:
-                def _on_rm_error(func, path, exc_info):
-                    # try to make writable and retry
-                    try:
-                        os.chmod(path, 0o700)
-                    except Exception:
-                        pass
-                    try:
-                        func(path)
-                    except Exception:
-                        pass
-
-                shutil.rmtree(os.path.dirname(local_file_path), onerror=_on_rm_error)
-            except Exception:
-                # as a final fallback, attempt to remove files then the dir
+        # Clean up local file and temporary directory. Use recursive removal
+        # because HF downloads or intermediate tooling may leave extra files
+        # (e.g., cache dirs) in the temporary directory which prevents
+        # `os.rmdir` from succeeding.
+        import os
+        import shutil
+        try:
+            if os.path.exists(local_file_path):
+                os.remove(local_file_path)
+        except Exception:
+            # best-effort cleanup; do not fail the request because of cleanup
+            pass
+        try:
+            def _on_rm_error(func, path, exc_info):
+                # try to make writable and retry
                 try:
-                    for root, dirs, files in os.walk(os.path.dirname(local_file_path), topdown=False):
-                        for name in files:
-                            try:
-                                os.chmod(os.path.join(root, name), 0o600)
-                                os.remove(os.path.join(root, name))
-                            except Exception:
-                                pass
-                        for name in dirs:
-                            try:
-                                os.rmdir(os.path.join(root, name))
-                            except Exception:
-                                pass
-                    try:
-                        os.rmdir(os.path.dirname(local_file_path))
-                    except Exception:
-                        pass
+                    os.chmod(path, 0o700)
                 except Exception:
                     pass
-            # If the temp dir still exists, log a warning for diagnostics
+                try:
+                    func(path)
+                except Exception:
+                    pass
+
+            shutil.rmtree(os.path.dirname(local_file_path), onerror=_on_rm_error)
+        except Exception:
+            # as a final fallback, attempt to remove files then the dir
             try:
-                if os.path.exists(os.path.dirname(local_file_path)):
-                    logger.warning("Temp dir still exists after cleanup: %s", os.path.dirname(local_file_path))
+                for root, dirs, files in os.walk(os.path.dirname(local_file_path), topdown=False):
+                    for name in files:
+                        try:
+                            os.chmod(os.path.join(root, name), 0o600)
+                            os.remove(os.path.join(root, name))
+                        except Exception:
+                            pass
+                    for name in dirs:
+                        try:
+                            os.rmdir(os.path.join(root, name))
+                        except Exception:
+                            pass
+                try:
+                    os.rmdir(os.path.dirname(local_file_path))
+                except Exception:
+                    pass
             except Exception:
                 pass
+        # If the temp dir still exists, log a warning for diagnostics
+        try:
+            if os.path.exists(os.path.dirname(local_file_path)):
+                logger.warning("Temp dir still exists after cleanup: %s", os.path.dirname(local_file_path))
+        except Exception:
+            pass
 
 
-            # store metadata in memory
-            artifacts_metadata[id] = {
-                "name": artifact_name,
-                "type": artifact_type,
-                "url": artifact_url,
-                "download_url": download_url,
-                # "s3_key": s3_key
-            }
-            artifact_ids.append(id)
-            # for new ids, handles the case where multiple artifacts share the same name
-            if artifact_name not in artifact_name_to_id:
-                artifact_name_to_id[artifact_name] = []
-            artifact_name_to_id[artifact_name].append(id)
+        # store metadata in memory
+        artifacts_metadata[id] = {
+            "name": artifact_name,
+            "type": artifact_type,
+            "url": artifact_url,
+            "download_url": download_url,
+            # "s3_key": s3_key
+        }
+        artifact_ids.append(id)
+        # for new ids, handles the case where multiple artifacts share the same name
+        if artifact_name not in artifact_name_to_id:
+            artifact_name_to_id[artifact_name] = []
+        artifact_name_to_id[artifact_name].append(id)
 
-            # return artifact metadata and data as json
-            return JSONResponse(
-                content={
-                    "metadata": {
-                        "name": artifact_name,
-                        "id": id,
-                        "type": artifact_type
-                    },
-                    "data": {
-                        "url": artifact_url,
-                        "download_url": download_url
-                    }
+        # return artifact metadata and data as json
+        return JSONResponse(
+            content={
+                "metadata": {
+                    "name": artifact_name,
+                    "id": id,
+                    "type": artifact_type
                 },
-                status_code=201
-            )
-        
-        except Exception as e:
-            # If S3 upload fails, return 500
-            raise HTTPException(status_code=500, detail=f"S3 Upload failed: {str(e)}")
-    else:
-        # if rating fails, return 424
-        return Response(status_code=424)
+                "data": {
+                    "url": artifact_url,
+                    "download_url": download_url
+                }
+            },
+            status_code=201
+        )
+    
+    except Exception as e:
+        # If S3 upload fails, return 500
+        raise HTTPException(status_code=500, detail=f"S3 Upload failed: {str(e)}")
+    # else:
+    #     # if rating fails, return 424
+    #     return Response(status_code=424)
 
 # Get track
 @router.get("/tracks")
 async def get_tracks():
     # return track as json
-    return JSONResponse(content={"plannedTracks": "Performance track"}, status_code=200)
+    return JSONResponse(content={"planned_tracks": "performance track"}, status_code=200)
 
 
 # license check of model against github project 
@@ -598,7 +598,7 @@ async def check_license(id: int, request: LicenseCheckRequest) -> JSONResponse:
     )
 
 # get lineage graph of model, refer to evan's metric generation for that 
-@router.post("/artifact/model/{id}/lineage")
+@router.get("/artifact/model/{id}/lineage")
 async def get_lineage_graph(id: int) -> JSONResponse:
     # check if id exists in the registry metadata db 
     # if it does not, return 404
