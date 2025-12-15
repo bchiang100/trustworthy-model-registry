@@ -21,9 +21,9 @@ Requires-Dist: pytest-mock>=3.14; extra == "dev"
 Requires-Dist: respx>=0.21; extra == "dev"
 Requires-Dist: selenium>=4.15; extra == "dev"
 
-# ACME Trustworthy Model CLI
+# ACME Trustworthy Model Registry
 
-This repository implements the ECE 46100 Project Phase 1 deliverable for ACME Corporation’s internal model registry CLI. The tool evaluates pre-trained Hugging Face models against Sarah’s requirements and prints NDJSON scorecards ready for ingestion by downstream systems.
+This repository implements Phase 2 of the ECE46100 ACME Corporation Model Registry. This tool allows for clients to upload, download, search, and interact with models to the registry through both a programmatic RESTful API and a frontend interface. All models requested for ingestion are first rated to ensure they meet minimum standards of quality for ACME. 
 
 ## Getting Started
 
@@ -54,8 +54,8 @@ Only model URLs emit NDJSON output; datasets and code are used to enrich the met
 
 - `LOG_FILE`: absolute path for log output. Defaults to stderr when unset.
 - `HUGGINGFACEHUB_API_TOKEN` / `HF_API_TOKEN`: token used for Hugging Face Hub and Inference API calls. Required to exercise the LLM-backed metric at scale.
-- `ACME_LLM_MODEL`: optional override for the Hugging Face inference model (default `meta-llama/Llama-3.2-1B-Instruct`).
-- `ACME_MAX_WORKERS`: overrides the metric evaluation thread pool size.
+- `ACME_LLM_MODEL`: optional override for the Hugging Face inference model (default `meta-llama/Llama-3.2-1B-Instruct`) used to analyze READMEs.
+- `ACME_MAX_WORKERS`: overrides the metric evaluation thread pool size; important as metrics are calculated concurrently.
 
 ## NDJSON Schema (Table 1 Compliance)
 
@@ -93,7 +93,7 @@ Latencies are rounded to milliseconds as required.
 - Critical components (URL parsing, context building, metrics, registry, runner, scoring pipeline) are unit tested.
 
 ## Team
-
-- Yuan Chi Chang
-- Wei Yun Liu
-- Ruoyu Hu
+- Parin Timbadia 
+- Bryan Chiang
+- Daniel Wu
+- Evan Zhang 
