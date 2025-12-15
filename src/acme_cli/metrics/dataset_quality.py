@@ -51,7 +51,7 @@ class DatasetQualityMetric(Metric):
                 # Boost for well-known dataset names in URLs
                 url_text = " ".join(context.target.dataset_urls).lower()
                 if any(name in url_text for name in ["wikitext", "squad", "glue", "imagenet", "coco"]):
-                    bonus_points += 0.1
+                    bonus_points += 0.2
 
                 return clamp(base_score + bonus_points)
             return 0.0
@@ -71,13 +71,13 @@ class DatasetQualityMetric(Metric):
             org in dataset_readme + " " + dataset_id
             for org in ["anthropic", "openai", "google", "microsoft", "meta"]
         ):
-            organization_bonus = 1.0
+            organization_bonus = 1.2
         # High-quality AI companies and platforms
         elif any(
             org in dataset_readme + " " + dataset_id
             for org in ["huggingface", "deepseek", "alibaba", "tongyi"]
         ):
-            organization_bonus = 0.9
+            organization_bonus = 1.1
         # Research institutions and quality dataset indicators
         elif any(
             indicator in dataset_readme + " " + dataset_id
@@ -93,7 +93,7 @@ class DatasetQualityMetric(Metric):
                 "harmless",
             ]
         ):
-            organization_bonus = 0.8
+            organization_bonus = 1.0
         # General quality indicators for good datasets
         elif any(
             keyword in dataset_readme
@@ -105,7 +105,7 @@ class DatasetQualityMetric(Metric):
                 "validated",
             ]
         ):
-            organization_bonus = 0.6
+            organization_bonus = 0.8
 
         governance_component = 0.0
         license_values: list[str] = []
@@ -135,14 +135,14 @@ class DatasetQualityMetric(Metric):
 
         # Boost for comprehensive metadata
         if metadata.tags and len(metadata.tags) >= 3:
-            bonus_points += 0.1  # Well-tagged datasets
+            bonus_points += 0.2  # Well-tagged datasets
 
         # Boost for good documentation length
         readme_length = len(context.dataset_readme_text or "")
         if readme_length > 500:
-            bonus_points += 0.1
+            bonus_points += 0.15
         elif readme_length > 1000:
-            bonus_points += 0.15  # Extra boost for very detailed docs
+            bonus_points += 0.2  # Extra boost for very detailed docs
 
         # Boost for recent updates (if available in metadata)
         if hasattr(metadata, 'last_modified') and metadata.last_modified:
