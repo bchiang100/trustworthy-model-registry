@@ -1,4 +1,5 @@
-"""Helpers to compute and cache full model scores for lineage/tree computations.
+"""
+Helpers to compute and cache model scores for lineage/tree computations in ACME Registry.
 
 Provides a factory that returns a `score_fn(repo_id) -> float` which will
 check a `ScoreRegistry` for cached metric results, and if missing will run
@@ -18,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 
 def _average_metric_results(results: Mapping[str, MetricResult]) -> float:
-    """Average metric values from a MetricResult mapping.
-
-    Mirrors the averaging behavior used by the TreeScoreMetric.
+    """
+    Average metric values from a MetricResult mapping.
+    Used for TreeScoreMetric and similar metrics.
     """
     numeric_scores: list[float] = []
     for r in results.values():

@@ -1,3 +1,6 @@
+"""
+Local cache for Hugging Face repositories in ACME Registry.
+"""
 """Local repository download helpers."""
 
 from __future__ import annotations

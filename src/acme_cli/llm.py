@@ -1,4 +1,6 @@
-"""Wrapper around the Hugging Face Inference API for lightweight scoring."""
+"""
+Wrapper around the Hugging Face Inference API for lightweight scoring in ACME Registry.
+"""
 
 from __future__ import annotations
 
@@ -14,11 +16,16 @@ DEFAULT_LLM_MODEL = "meta-llama/Llama-3.2-1B-Instruct"
 
 
 class LlmUnavailable(RuntimeError):
-    """Raised when an LLM inference could not be completed."""
+    """
+    Raised when an LLM inference could not be completed.
+    """
 
 
 @dataclass(slots=True)
 class LlmConfig:
+    """
+    Configuration for LLM evaluation, including model and token.
+    """
     model: str = os.getenv("ACME_LLM_MODEL", DEFAULT_LLM_MODEL)
     token: str | None = os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv(
         "HF_API_TOKEN"
@@ -27,7 +34,9 @@ class LlmConfig:
 
 
 class LlmEvaluator:
-    """Simple text-to-score evaluator using an instruction-following LLM."""
+    """
+    Simple text-to-score evaluator using an instruction-following LLM.
+    """
 
     def __init__(self, config: LlmConfig | None = None) -> None:
         self._config = config or LlmConfig()
@@ -38,6 +47,10 @@ class LlmEvaluator:
         )
 
     def score_clarity(self, readme_text: str) -> float:
+        """
+        Score the clarity of a README using the LLM.
+        Returns a float score.
+        """
         prompt = (
             "You are reviewing developer documentation. Rate how easily an engineer could "
             "understand how to use the project. Return a single decimal number between 0 and 1, "

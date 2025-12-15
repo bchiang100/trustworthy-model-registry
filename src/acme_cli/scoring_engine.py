@@ -1,3 +1,7 @@
+"""
+Core scoring workflow that orchestrates data gathering and metrics in ACME Registry.
+"""
+
 """Core scoring workflow that orchestrates data gathering and metrics."""
 
 from __future__ import annotations
@@ -18,7 +22,10 @@ class ScoreSummary:
 
 
 class ModelScorer:
-    """Coordinates context building and metric evaluation."""
+    """
+    Coordinates context building and metric evaluation.
+    Uses ContextBuilder and Metric implementations to score models.
+    """
 
     def __init__(
         self,
@@ -29,12 +36,20 @@ class ModelScorer:
         self._metrics = list(metrics) if metrics else build_metrics()
 
     def score(self, target: ScoreTarget) -> ScoreSummary:
+        """
+        Score a model target by building its context and evaluating all metrics.
+        Returns a ScoreSummary with context and evaluation outcome.
+        """
         context = self._context_builder.build(target)
         outcome = evaluate_metrics(context, self._metrics)
         return ScoreSummary(context=context, outcome=outcome)
 
 
 def get_metric_value(outcome: EvaluationOutcome, name: str) -> MetricResult | None:
+    """
+    Retrieve a metric value by name from an EvaluationOutcome.
+    Returns the MetricResult or None if not found.
+    """
     return outcome.metrics.get(name)
 
 

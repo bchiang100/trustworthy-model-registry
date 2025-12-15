@@ -1,3 +1,6 @@
+"""
+Client for interacting with Hugging Face Hub in ACME Registry.
+"""
 """Thin wrapper around the Hugging Face Hub API with caching helpers."""
 
 from __future__ import annotations

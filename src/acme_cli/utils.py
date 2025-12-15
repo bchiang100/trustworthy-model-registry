@@ -1,4 +1,6 @@
-"""Utility helpers shared across the project."""
+"""
+Utility helpers shared across the ACME Registry project.
+"""
 
 from __future__ import annotations
 
@@ -9,26 +11,37 @@ from typing import Callable, Iterable, Iterator
 
 
 def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
-    """Clamp *value* into the inclusive range ``[lower, upper]``."""
+    """
+    Clamp *value* into the inclusive range [lower, upper].
+    """
     return max(lower, min(upper, value))
 
 
 def safe_div(numerator: float, denominator: float, default: float = 0.0) -> float:
-    """Return ``numerator / denominator`` guarding against division by zero."""
+    """
+    Return numerator / denominator, guarding against division by zero.
+    Returns default if denominator is zero.
+    """
     if denominator == 0:
         return default
     return numerator / denominator
 
 
 def word_count(text: str | None) -> int:
-    """Compute a simple word count for *text*."""
+    """
+    Compute a simple word count for the input text.
+    Returns 0 if text is None.
+    """
     if not text:
         return 0
     return len(re.findall(r"\b\w+\b", text))
 
 
 def count_code_fences(text: str | None) -> int:
-    """Count Markdown code fences in *text* (````` or indented blocks)."""
+    """
+    Count Markdown code fences in the input text.
+    Returns 0 if text is None.
+    """
     if not text:
         return 0
     return text.count("```")
@@ -36,7 +49,10 @@ def count_code_fences(text: str | None) -> int:
 
 @contextmanager
 def timed_operation() -> Iterator[Callable[[], int]]:
-    """Context manager returning a callable that yields elapsed milliseconds."""
+    """
+    Context manager returning a callable that yields elapsed milliseconds.
+    Used for timing operations.
+    """
     start = time.perf_counter()
 
     def _elapsed() -> int:

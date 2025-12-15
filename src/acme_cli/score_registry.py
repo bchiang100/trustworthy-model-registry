@@ -1,4 +1,7 @@
-"""Score registry for storing and retrieving cached model evaluation scores."""
+"""
+Score registry for storing and retrieving cached model evaluation scores in ACME Registry.
+"""
+
 from __future__ import annotations
 
 import json
@@ -13,23 +16,25 @@ logger = logging.getLogger(__name__)
 
 
 class ScoreRegistry(ABC):
-    """Abstract interface for storing and retrieving model scores."""
+    """
+    Abstract interface for storing and retrieving model scores.
+    Provides methods for getting, saving, and checking cached scores.
+    """
 
     @abstractmethod
     def get_score(self, repo_id: str) -> Mapping[str, MetricResult] | None:
-        """Get cached scores for a model.
-        
+        """
+        Get cached scores for a model.
         Args:
             repo_id: The model repository ID
-            
         Returns:
             Dictionary mapping metric names to MetricResult, or None if not cached
         """
 
     @abstractmethod
     def save_score(self, repo_id: str, scores: Mapping[str, MetricResult]) -> None:
-        """Save scores for a model.
-        
+        """
+        Save scores for a model.
         Args:
             repo_id: The model repository ID
             scores: Dictionary mapping metric names to MetricResult
@@ -37,13 +42,12 @@ class ScoreRegistry(ABC):
 
     @abstractmethod
     def has_score(self, repo_id: str) -> bool:
-        """Check if scores are cached for a model.
-        
+        """
+        Check if scores are cached for a model.
         Args:
             repo_id: The model repository ID
-            
         Returns:
-            True if scores are cached
+            True if scores are cached, False otherwise.
         """
 
 

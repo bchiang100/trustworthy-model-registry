@@ -1,4 +1,6 @@
-"""Middleware for collecting metrics and monitoring requests."""
+"""
+Middleware for collecting metrics and monitoring requests in ACME Registry API.
+"""
 
 import time
 
@@ -9,14 +11,20 @@ from acme_cli.api.monitoring import get_metrics_collector
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
-    """Middleware to collect request metrics for monitoring."""
+    """
+    Middleware to collect request metrics for monitoring.
+    Records request/response times and errors for observability.
+    """
 
     def __init__(self, app):
         super().__init__(app)
         self.metrics_collector = get_metrics_collector()
 
     async def dispatch(self, request: Request, call_next):
-        """Process request and collect metrics."""
+        """
+        Process request and collect metrics for monitoring.
+        Records timing, status, and errors for each request.
+        """
         start_time = time.time()
 
         # Record request start

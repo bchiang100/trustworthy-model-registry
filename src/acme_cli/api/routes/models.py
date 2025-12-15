@@ -1,3 +1,8 @@
+"""
+API routes for managing model and artifact endpoints in the ACME Registry.
+Provides CRUD operations, artifact queries, and registry management.
+"""
+
 # manages model endpoints for CR[U]D operations
 
 import logging
@@ -192,6 +197,11 @@ async def get_health():
 # query artifacts
 @router.post("/artifacts")
 async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
+    """
+    Query artifacts in the registry by name and type, with optional pagination.
+    If request contains a wildcard ("*"), returns all artifacts up to the pagination size.
+    Otherwise, searches for artifacts matching the provided names and types.
+    """
     pagination_offset: int = int(offset)
 
     # enumerate all artifacts in the registry metadata up to pagination size or end of registry
@@ -222,6 +232,10 @@ async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
 # reset registry (remove all entries)
 @router.delete("/reset")
 async def reset_registry():
+    """
+    Reset the registry by clearing all stored metadata and artifact mappings.
+    Intended for administrative use or testing.
+    """
     # clear all stored metadata
     artifacts_metadata.clear()
     artifact_ids.clear()

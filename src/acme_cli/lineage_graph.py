@@ -1,4 +1,6 @@
-"""Model lineage graph extraction and analysis."""
+"""
+Model lineage graph extraction and analysis for ACME Registry.
+"""
 from __future__ import annotations
 
 import json
@@ -15,7 +17,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class LineageNode:
-    """Represents a single model in the lineage graph."""
+    """
+    Represents a single model in the lineage graph.
+    Holds repo_id, parent_ids, and metadata.
+    """
 
     repo_id: str
     """The repository ID in format 'organization/model'."""
@@ -29,7 +34,10 @@ class LineageNode:
 
 @dataclass(slots=True)
 class LineageGraph:
-    """Represents the complete lineage graph for a model and its ancestors."""
+    """
+    Represents the complete lineage graph for a model and its ancestors.
+    Contains all nodes and discovery metadata.
+    """
 
     root_repo_id: str
     """The root/target model repo ID."""

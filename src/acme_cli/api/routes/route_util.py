@@ -1,3 +1,7 @@
+"""
+Utility functions for route handling, URL validation, and GitHub integration in ACME Registry API.
+"""
+
 import base64
 import os
 from urllib.parse import urlparse, urlunparse 
@@ -16,6 +20,10 @@ HEADERS = {
 
 # detects if a string is a single url of valid format and http(s)
 def validate_url_string(url: str) -> bool:
+    """
+    Validate if the input string is a single valid HTTP(S) URL.
+    Returns True if valid, False otherwise.
+    """
     url = url.strip()
     matches = re.findall(URL_REGEX, url) 
     if len(matches) == 0 or len(matches) > 1:
@@ -36,6 +44,10 @@ def validate_url_string(url: str) -> bool:
 
 # standardize
 def standardize_url(url: str) -> str:
+    """
+    Standardize a URL by stripping whitespace and normalizing its format.
+    Returns the standardized URL string.
+    """
     parsed = urlparse(url.strip())
 
     scheme = parsed.scheme.lower()

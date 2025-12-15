@@ -1,4 +1,6 @@
-"""Utilities for parsing and classifying artifact URLs."""
+"""
+Utilities for parsing and classifying artifact URLs in ACME Registry.
+"""
 
 from __future__ import annotations
 
@@ -23,6 +25,10 @@ _GITLAB_HOSTS = {"gitlab.com"}
 
 
 def parse_artifact_url(url: str) -> ParsedUrl:
+    """
+    Parse an artifact URL and return a structured ParsedUrl object.
+    Determines platform and kind (model, dataset, code, unknown).
+    """
     parsed = urlparse(url.strip())
     host = parsed.netloc.lower()
     path = parsed.path.strip("/")

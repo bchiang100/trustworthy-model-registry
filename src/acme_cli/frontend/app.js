@@ -1,3 +1,4 @@
+// Main frontend application logic for ACME Registry.
 // Frontend app for the registry UI
 // This version calls the API routes under /api/v1 (see server in ../api)
 

@@ -1,4 +1,6 @@
-"""Load and organize scoring targets from the user-supplied URL file."""
+"""
+Load and organize scoring targets from user-supplied URL files for ACME Registry.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +12,10 @@ from acme_cli.urls import is_code_url, is_dataset_url, is_model_url
 
 
 def parse_url_file(path: Path) -> list[ScoreTarget]:
-    """Parse *path* into a list of :class:`ScoreTarget` objects."""
+    """
+    Parse a file at *path* into a list of ScoreTarget objects.
+    Groups datasets and code URLs with their corresponding model URLs.
+    """
     lines = [line.strip() for line in _iter_lines(path) if line.strip()]
     dataset_buffer: list[str] = []
     code_buffer: list[str] = []

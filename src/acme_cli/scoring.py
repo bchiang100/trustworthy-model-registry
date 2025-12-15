@@ -1,4 +1,6 @@
-"""User-facing scoring pipeline producing NDJSON output."""
+"""
+User-facing scoring pipeline producing NDJSON output for ACME Registry.
+"""
 
 from __future__ import annotations
 
@@ -20,7 +22,10 @@ LOGGER = logging.getLogger("acme_cli")
 
 
 def score_file(url_file: Path, cli_args: Sequence[str]) -> None:
-    """Score every model referenced in *url_file* and emit NDJSON to stdout."""
+    """
+    Score every model referenced in url_file and emit NDJSON to stdout.
+    Uses ModelScorer and ContextBuilder for evaluation.
+    """
     _configure_logging()
     targets = parse_url_file(url_file)
     if not targets:
@@ -37,6 +42,10 @@ def score_file(url_file: Path, cli_args: Sequence[str]) -> None:
 
 
 def _score_target(scorer: ModelScorer, target: ScoreTarget) -> dict[str, Any]:
+    """
+    Score a single model target and return a result dictionary.
+    Handles exceptions and logging.
+    """
     try:
         summary = scorer.score(target)
         outcome = summary.outcome

@@ -1,4 +1,6 @@
-"""Utilities to derive the aggregated net score."""
+"""
+Utilities to derive the aggregated net score for ACME Registry models.
+"""
 
 from __future__ import annotations
 
@@ -24,6 +26,10 @@ _DEFAULT_WEIGHTS: dict[str, float] = {
 def compute_net_score(
     outcome: EvaluationOutcome, weights: MetricWeights | None = None
 ) -> MetricResult:
+    """
+    Compute the aggregated net score for a model evaluation outcome.
+    Applies metric weights and clamps the result to [0, 1].
+    """
     weights = dict(weights or _DEFAULT_WEIGHTS)
     with timed_operation() as elapsed:
         score = 0.0
@@ -38,6 +44,9 @@ def compute_net_score(
 
 
 def _scalar_metric_value(metric: MetricResult) -> float:
+    """
+    Extract a scalar value from a MetricResult, handling dicts and numbers.
+    """
     value = metric.value
     if isinstance(value, Mapping):
         if not value:

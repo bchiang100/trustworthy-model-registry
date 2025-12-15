@@ -1,4 +1,6 @@
-"""Build rich contexts for metric evaluation."""
+"""
+Build rich contexts for metric evaluation in ACME Registry.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +20,10 @@ from acme_cli.urls import parse_artifact_url
 
 
 class ContextBuilder:
-    """Constructs :class:`ModelContext` instances used by metrics."""
+    """
+    Constructs ModelContext instances used by metrics.
+    Builds context from ScoreTarget, fetching metadata and repositories.
+    """
 
     def __init__(
         self,
@@ -29,6 +34,10 @@ class ContextBuilder:
         self._cache = repo_cache or RepositoryCache()
 
     def build(self, target: ScoreTarget) -> ModelContext:
+        """
+        Build a ModelContext for the given ScoreTarget.
+        Fetches model, dataset, and code metadata as needed.
+        """
         parsed_model = parse_artifact_url(target.model_url)
         model_metadata: ModelMetadata | None = None
         dataset_metadata: DatasetMetadata | None = None

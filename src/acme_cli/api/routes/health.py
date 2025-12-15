@@ -1,4 +1,6 @@
-"""Health check endpoints for system monitoring and dashboard."""
+"""
+Health check endpoints for system monitoring and dashboard in ACME Registry API.
+"""
 
 from datetime import datetime, timedelta
 
@@ -15,7 +17,11 @@ system_monitor = SystemMonitor()
 
 @router.get("/health/dashboard")
 async def health_dashboard():
-    """Comprehensive system health dashboard with semi-real-time metrics."""
+    """
+    Comprehensive system health dashboard endpoint.
+    Returns metrics, system stats, and activity stats for monitoring.
+    """
+    
     try:
         # Get metrics for the last hour
         end_time = datetime.utcnow()
