@@ -179,7 +179,7 @@ class UpdateArtifactRequest(BaseModel):
 
 class QueryRequest(BaseModel):
     name: str 
-    types: List[str]  # "model", "dataset", "code"
+    types: List[str] | None # "model", "dataset", "code"
 
 
 ## SPEC COMPLIANT ENDPOINTS 
@@ -211,7 +211,7 @@ async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
         types = query.types
         for id in artifact_name_to_id.get(name, []):
             artifact = artifacts_metadata[id]
-            if artifact["type"] in types: 
+            if artifact["type"] in types or types == None: 
                 type = artifacts_metadata[id]["type"]
                 artifacts.append({"name": name, "id": id, "type": type})
     headers = {offset: str(pagination_offset + len(artifacts))}
