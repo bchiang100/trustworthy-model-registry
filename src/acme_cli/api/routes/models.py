@@ -382,14 +382,41 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
 
     if rating >= 0.2: # trustworthy
         try:
-            # download artifact from huggingface
-            local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
-
-            # creates S3 key for the artifact
+            # attempt to stream a preferred single file directly to S3 to avoid
+            # persisting large files on the local EC2 instance. If streaming
+            # fails, fall back to the existing local download + upload flow.
             s3_key = f"{artifact_type}/{id}/.tar.gz"
+            download_url = None
+            skip_local = False
 
-            # upload to S3 and get download URL
-            download_url = upload_to_s3(local_file_path, s3_key)
+            try:
+                parsed = parse_artifact_url(artifact_url)
+                if parsed and is_model_url(artifact_url):
+                    repo_id = parsed.repo_id
+                    info = hf_client.get_model(repo_id)
+                    preferred = hf_client.choose_preferred_file(info.files) if info else None
+                    if preferred:
+                        ok = hf_client.stream_file_to_s3(
+                            repo_id=repo_id,
+                            filename=preferred,
+                            bucket=S3_BUCKET_NAME,
+                            key=s3_key,
+                            repo_type="model",
+                            s3_client=s3_client,
+                        )
+                        if ok:
+                            download_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
+                            skip_local = True
+            except Exception:
+                # non-fatal; fall back to local download path below
+                pass
+
+            if not skip_local:
+                # download artifact from huggingface (local filesystem)
+                local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
+
+                # upload to S3 and get download URL
+                download_url = upload_to_s3(local_file_path, s3_key)
 
             # Clean up local file and temporary directory. Use recursive removal
             # because HF downloads or intermediate tooling may leave extra files
@@ -673,38 +700,6 @@ async def get_model_rating(id: int) -> JSONResponse:
 
     return JSONResponse(content=rating, status_code=200)
 
-
-# @router.get("/artifact/model/{id}/metric/{metric_name}/")
-# async def get_single_metric(id: str, metric_name: str) -> JSONResponse:
-#     """Return a single metric value and an approximate latency for the artifact.
-
-#     metric_name should be one of the metric keys included in the ModelRating
-#     (e.g., 'ramp_up_time', 'code_quality', 'size_score', 'reproducibility').
-#     """
-#     if id not in artifacts_metadata:
-#         return Response(status_code=404)
-
-#     meta = artifacts_metadata[id]
-#     if meta.get("type") != "model":
-#         return Response(status_code=400)
-
-#     url = meta.get("url")
-#     if not url:
-#         return Response(status_code=400)
-
-#     start = time.monotonic()
-#     metrics = calculate_metrics(url)
-#     elapsed = time.monotonic() - start
-
-#     if not metrics:
-#         raise HTTPException(status_code=500, detail="Failed to compute metrics")
-
-#     if metric_name not in metrics:
-#         return Response(status_code=404)
-
-#     value = metrics.get(metric_name)
-
-#     return JSONResponse(content={"metric": metric_name, "value": value, "latency_seconds": elapsed}, status_code=200)
 
 # get cost of artifact
 @router.get("/artifact/{artifact_type}/{id}/cost")
