@@ -34,7 +34,7 @@ apt update && apt upgrade -y
 
 # Step 2: Install dependencies
 echo "[2/8] Installing system dependencies..."
-apt install -y python3.10 python3.10-venv python3-pip git curl nginx certbot python3-certbot-nginx
+apt install -y python3.12 python3.12-venv python3-pip git curl nginx certbot python3-certbot-nginx
 
 # Step 3: Create app directory
 echo "[3/8] Creating application directory..."
@@ -49,7 +49,7 @@ sudo -u "$APP_USER" git clone "$REPO_URL" . || git pull
 # Step 5: Setup Python environment
 echo "[5/8] Setting up Python virtual environment..."
 cd "$APP_DIR"
-sudo -u "$APP_USER" python3.10 -m venv venv
+sudo -u "$APP_USER" python3.12 -m venv venv || sudo -u "$APP_USER" python3 -m venv venv
 sudo -u "$APP_USER" bash -c 'source venv/bin/activate && pip install --upgrade pip setuptools wheel'
 sudo -u "$APP_USER" bash -c 'source venv/bin/activate && pip install -e .'
 sudo -u "$APP_USER" bash -c 'source venv/bin/activate && pip install gunicorn uvicorn'
