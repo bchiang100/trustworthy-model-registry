@@ -31,22 +31,22 @@ class DatasetQualityMetric(Metric):
                 for url in context.target.dataset_urls:
                     parsed = parse_artifact_url(url)
                     if parsed.platform == "huggingface":
-                        base_score = max(base_score, 0.6)  # HF datasets are generally good quality
+                        base_score = max(base_score, 0.8)  # HF datasets are generally good quality
                     elif parsed.platform in {"github", "gitlab"}:
-                        base_score = max(base_score, 0.3)  # Code repos may have datasets
+                        base_score = max(base_score, 0.5)  # Code repos may have datasets
                     else:
-                        base_score = max(base_score, 0.2)  # Other sources
+                        base_score = max(base_score, 0.4)  # Other sources
 
                 # Additional boost points even without metadata
                 bonus_points = 0.0
 
                 # Boost for multiple dataset sources
                 if len(context.target.dataset_urls) > 1:
-                    bonus_points += 0.1
+                    bonus_points += 0.15
 
                 # Boost for having model documentation that might describe dataset
                 if context.readme_text and len(context.readme_text.strip()) > 200:
-                    bonus_points += 0.15
+                    bonus_points += 0.2
 
                 # Boost for well-known dataset names in URLs
                 url_text = " ".join(context.target.dataset_urls).lower()
