@@ -36,7 +36,24 @@ class DatasetQualityMetric(Metric):
                         base_score = max(base_score, 0.3)  # Code repos may have datasets
                     else:
                         base_score = max(base_score, 0.2)  # Other sources
-                return base_score
+
+                # Additional boost points even without metadata
+                bonus_points = 0.0
+
+                # Boost for multiple dataset sources
+                if len(context.target.dataset_urls) > 1:
+                    bonus_points += 0.1
+
+                # Boost for having model documentation that might describe dataset
+                if context.readme_text and len(context.readme_text.strip()) > 200:
+                    bonus_points += 0.15
+
+                # Boost for well-known dataset names in URLs
+                url_text = " ".join(context.target.dataset_urls).lower()
+                if any(name in url_text for name in ["wikitext", "squad", "glue", "imagenet", "coco"]):
+                    bonus_points += 0.1
+
+                return clamp(base_score + bonus_points)
             return 0.0
 
         size_component = self._size_component(metadata.size_bytes)
@@ -112,6 +129,30 @@ class DatasetQualityMetric(Metric):
             + 0.2 * governance_component
             + 0.5 * organization_bonus
         )
+
+        # Additional boost points for dataset quality indicators
+        bonus_points = 0.0
+
+        # Boost for comprehensive metadata
+        if metadata.tags and len(metadata.tags) >= 3:
+            bonus_points += 0.1  # Well-tagged datasets
+
+        # Boost for good documentation length
+        readme_length = len(context.dataset_readme_text or "")
+        if readme_length > 500:
+            bonus_points += 0.1
+        elif readme_length > 1000:
+            bonus_points += 0.15  # Extra boost for very detailed docs
+
+        # Boost for recent updates (if available in metadata)
+        if hasattr(metadata, 'last_modified') and metadata.last_modified:
+            bonus_points += 0.05  # Actively maintained
+
+        # Boost for having both license AND citation
+        if metadata.citation and metadata.license:
+            bonus_points += 0.1  # Well-governed dataset
+
+        score += bonus_points
         return clamp(score)
 
     @staticmethod

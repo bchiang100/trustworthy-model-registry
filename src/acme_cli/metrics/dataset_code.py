@@ -48,6 +48,26 @@ class DatasetAndCodeMetric(Metric):
                     quality_bonus = max(quality_bonus, 0.3)  # Higher for others
             score += quality_bonus
 
+        # Additional boost points for comprehensive artifact availability
+        bonus_points = 0.0
+
+        # Boost for having both datasets and code
+        if (dataset_metadata or dataset_urls) and code_urls:
+            bonus_points += 0.1
+
+        # Boost for multiple code repositories (shows maturity)
+        if code_urls and len(code_urls) > 1:
+            bonus_points += 0.05
+
+        # Boost for multiple dataset sources (shows thoroughness)
+        if dataset_urls and len(dataset_urls) > 1:
+            bonus_points += 0.05
+
+        # Boost for having model documentation
+        if context.readme_text and len(context.readme_text.strip()) > 100:
+            bonus_points += 0.1
+
+        score += bonus_points
         return clamp(score)
 
 
