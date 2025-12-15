@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Model Registry — Mock UI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Model Registry — Mock UI</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="ingest.html">Ingest</a>
+      <a href="license_check.html">License Check</a>
+      <a href="enumerate.html">Enumerate / Search</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="intro">
+  <p>Welcome to the model registry! (pages: rate, delete, ingest, license check, enumerate). Use the navigation to try pages.</p>
+    </section>
+    <section id="recent">
+      <h2>Sample Models</h2>
+      <div id="model-list" class="card-grid" role="region" aria-live="polite"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button onclick="doReset()" class="secondary">Reset Registry</button>
+        <small class="muted">Reset will clear all in-memory metadata and remote S3 objects (if enabled).</small>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

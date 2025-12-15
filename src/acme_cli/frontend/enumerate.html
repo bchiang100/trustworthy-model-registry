@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Enumerate / Search — Mock Registry</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Enumerate / Regex Search — Mock UI</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="ingest.html">Ingest</a>
+      <a href="license_check.html">License Check</a>
+      <a href="enumerate.html">Enumerate / Search</a>
+    </nav>
+  </header>
+  <main>
+    <section class="card" aria-labelledby="regex-title">
+      <h2 id="regex-title">Regex search</h2>
+      <p class="muted">Enter a Python-style regular expression (no delimiters). Matches artifact name or README contents.</p>
+      <div class="row" style="align-items:center">
+        <input id="q" type="text" placeholder="e.g. gpt|vision|apache" aria-label="Search regular expression" />
+        <button onclick="doRegexSearch()">Search</button>
+      </div>
+      <div id="results" style="margin-top:12px"></div>
+    </section>
+
+    <section class="card" aria-labelledby="id-search-title">
+      <h2 id="id-search-title">Search by ID</h2>
+      <p class="muted">Lookup a single artifact by type and id.</p>
+      <div class="row" style="align-items:center">
+        <div>
+          <label for="artifact-type">Type</label>
+          <select id="artifact-type" aria-label="Artifact type">
+            <option value="model">model</option>
+            <option value="dataset">dataset</option>
+            <option value="code">code</option>
+          </select>
+        </div>
+        <div>
+          <label for="artifact-id">ID</label>
+          <input id="artifact-id" type="text" placeholder="artifact id" aria-label="Artifact id" />
+        </div>
+        <div>
+          <button onclick="doIdSearch()">Find</button>
+        </div>
+      </div>
+      <div id="id-result" style="margin-top:12px"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

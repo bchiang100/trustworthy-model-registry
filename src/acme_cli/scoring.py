@@ -1,4 +1,7 @@
-"""User-facing scoring pipeline producing NDJSON output."""
+"""
+User-facing scoring pipeline producing NDJSON output for ACME Registry.
+"""
+
 from __future__ import annotations
 
 import json
@@ -19,7 +22,10 @@ LOGGER = logging.getLogger("acme_cli")
 
 
 def score_file(url_file: Path, cli_args: Sequence[str]) -> None:
-    """Score every model referenced in *url_file* and emit NDJSON to stdout."""
+    """
+    Score every model referenced in url_file and emit NDJSON to stdout.
+    Uses ModelScorer and ContextBuilder for evaluation.
+    """
     _configure_logging()
     targets = parse_url_file(url_file)
     if not targets:
@@ -36,12 +42,18 @@ def score_file(url_file: Path, cli_args: Sequence[str]) -> None:
 
 
 def _score_target(scorer: ModelScorer, target: ScoreTarget) -> dict[str, Any]:
+    """
+    Score a single model target and return a result dictionary.
+    Handles exceptions and logging.
+    """
     try:
         summary = scorer.score(target)
         outcome = summary.outcome
         net_metric = compute_net_score(outcome)
         outcome.metrics[net_metric.name] = net_metric
-        record = _build_record(summary.context.target.model_url, summary.context, outcome)
+        record = _build_record(
+            summary.context.target.model_url, summary.context, outcome
+        )
         if outcome.failures:
             for failure in outcome.failures:
                 LOGGER.warning("Metric %s failed: %s", failure.name, failure.message)
@@ -65,9 +77,17 @@ def _build_record(model_url: str, context, outcome) -> dict[str, Any]:  # type: 
     record.update(_metric_field(outcome, "dataset_and_code_score", 0.0))
     record.update(_metric_field(outcome, "dataset_quality", 0.0))
     record.update(_metric_field(outcome, "code_quality", 0.0))
+    record.update(_metric_field(outcome, "reproducibility", 0.0))
+    record.update(_metric_field(outcome, "reviewedness", 0.0))
+    record.update(_metric_field(outcome, "tree_score", 0.0))
     size_value, size_latency = _metric_value(outcome, "size_score", {})
     if not size_value:
-        size_value = {"raspberry_pi": 0.0, "jetson_nano": 0.0, "desktop_pc": 0.0, "aws_server": 0.0}
+        size_value = {
+            "raspberry_pi": 0.0,
+            "jetson_nano": 0.0,
+            "desktop_pc": 0.0,
+            "aws_server": 0.0,
+        }
     record["size_score"] = size_value
     record["size_score_latency"] = size_latency
     return record
@@ -110,7 +130,12 @@ def _empty_record(model_url: str, error: str | None = None) -> dict[str, Any]:
         "performance_claims_latency": 0,
         "license": 0.0,
         "license_latency": 0,
-        "size_score": {"raspberry_pi": 0.0, "jetson_nano": 0.0, "desktop_pc": 0.0, "aws_server": 0.0},
+        "size_score": {
+            "raspberry_pi": 0.0,
+            "jetson_nano": 0.0,
+            "desktop_pc": 0.0,
+            "aws_server": 0.0,
+        },
         "size_score_latency": 0,
         "dataset_and_code_score": 0.0,
         "dataset_and_code_score_latency": 0,
@@ -118,6 +143,12 @@ def _empty_record(model_url: str, error: str | None = None) -> dict[str, Any]:
         "dataset_quality_latency": 0,
         "code_quality": 0.0,
         "code_quality_latency": 0,
+        "reproducibility": 0.0,
+        "reproducibility_latency": 0,
+        "reviewedness": 0.0,
+        "reviewedness_latency": 0,
+        "tree_score": 0.0,
+        "tree_score_latency": 0,
     }
     if error:
         record["error"] = error

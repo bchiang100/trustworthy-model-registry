@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Model — Mock Registry</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Model — Mock UI</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="ingest.html">Ingest</a>
+      <a href="license_check.html">License Check</a>
+      <a href="enumerate.html">Enumerate / Search</a>
+    </nav>
+  </header>
+  <main>
+    <section id="model-card" class="card">
+      <div id="content">Loading...</div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+  <script>
+    function getParam(k){ const p = new URLSearchParams(location.search); return p.get(k); }
+    const id = getParam('id');
+    const content = document.getElementById('content');
+    if(!id) content.innerHTML = '<p class="muted">Model not specified. Go back to <a href="index.html">home</a>.</p>';
+    else{
+      // Fetch model details from API
+      (async ()=>{
+        try{
+          const res = await fetch('/api/v1/models/' + encodeURIComponent(id));
+          if(!res.ok){
+            if(res.status===404) return content.innerHTML = '<p class="muted">Model not found. Go back to <a href="index.html">home</a>.</p>';
+            throw new Error('Failed to fetch model: ' + res.status);
+          }
+          const m = await res.json();
+          const name = m.metadata?.name || m.id;
+          const desc = m.metadata?.description || '';
+          const license = (typeof m.metadata?.license === 'string' ? m.metadata.license : '');
+          const score = m.metadata?.net_score ?? 0;
+          content.innerHTML = `
+            <div style="flex:1">
+              <h2>${escapeHtml(name)}</h2>
+              <p>${escapeHtml(desc)}</p>
+              <p><small class="muted">license: ${escapeHtml(license)} • id: ${escapeHtml(m.id)} </small></p>
+              <p><strong>Net score:</strong> ${Number(score).toFixed(2)}</p>
+              <label>Submit rating (0-1):</label>
+              <div class="row">
+                <input id="ratingVal" type="text" value="0.8" />
+                <div><button onclick="submitRating('${m.id}', document.getElementById('ratingVal').value)">Submit</button></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button class="ghost" onclick="deleteModel('${m.id}')">Delete</button>
+<<<<<<< Updated upstream
+              <a href="upload.html"><button class="secondary">Upload another</button></a>
+=======
+              <button class="ghost" onclick="runLoadTest('${m.id}', 100)" style="background:#fff8f0">🔥 Load Test (100 clients)</button>
+>>>>>>> Stashed changes
+              <a href="/api/v1/models/${encodeURIComponent(m.id)}/download"><button>Download</button></a>
+            </div>
+          `;
+        }catch(err){
+          console.error(err);
+          content.innerHTML = '<p class="muted">Error loading model. See console for details.</p>';
+        }
+      })();
+    }
+  </script>
+</body>
+</html>

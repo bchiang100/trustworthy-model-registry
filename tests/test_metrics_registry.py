@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from acme_cli.metrics.base import Metric
 from acme_cli.metrics.registry import build_metrics, evaluate_metrics
-from acme_cli.types import EvaluationOutcome, LocalRepository, ModelContext, ModelMetadata, RepoFile, ScoreTarget
+from acme_cli.types import (
+    EvaluationOutcome,
+    LocalRepository,
+    ModelContext,
+    ModelMetadata,
+    RepoFile,
+    ScoreTarget,
+)
 
 
 class _ZeroMetric(Metric):

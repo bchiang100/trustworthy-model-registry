@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>License Check — Mock Registry</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>License Compatibility Check — Mock UI</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="ingest.html">Ingest</a>
+      <a href="license_check.html">License Check</a>
+      <a href="enumerate.html">Enumerate / Search</a>
+    </nav>
+  </header>
+  <main>
+    <section class="card">
+      <h2>Determine license compatibility</h2>
+      <p class="muted">Provide the target GitHub project license (what your project uses) and the model's license. This runs a simple compatibility check (mock mapping).</p>
+      <form onsubmit="event.preventDefault(); performLicenseCheck(this)">
+        <label>GitHub project license</label>
+        <select name="github_license">
+          <option value="mit">MIT</option>
+          <option value="apache-2.0">Apache-2.0</option>
+          <option value="gpl-3.0">GPL-3.0</option>
+          <option value="proprietary">Proprietary</option>
+        </select>
+        <label>Model license</label>
+        <select name="model_license">
+          <option value="mit">MIT</option>
+          <option value="apache-2.0">Apache-2.0</option>
+          <option value="gpl-3.0">GPL-3.0</option>
+          <option value="proprietary">Proprietary</option>
+        </select>
+        <div style="margin-top:12px"><button type="submit">Check</button></div>
+      </form>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

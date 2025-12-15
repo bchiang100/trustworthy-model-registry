@@ -1,0 +1,39 @@
+name: Deploy ACME API
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::2750-6247-8356:role/GitHubActionsEC2Deploy
+          aws-region: us-east-1
+
+      - name: Run command on EC2 via SSM
+        run: |
+          aws ssm send-command \
+            --targets "Key=InstanceIds,Values=i-0123456789abcdef0" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy ACME API" \
+            --parameters 'commands=[
+              "cd /home/ec2-user/acme_app",
+              "git reset --hard",
+              "git pull origin main",
+              "source venv/bin/activate",
+              "pip install -r requirements.txt",
+              "sudo systemctl daemon-reload",
+              "sudo systemctl restart acme.service"
+            ]'

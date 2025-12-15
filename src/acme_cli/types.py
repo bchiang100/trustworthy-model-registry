@@ -1,4 +1,7 @@
-"""Typed data structures used across the ACME CLI implementation."""
+"""
+Typed data structures used across the ACME CLI implementation.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -11,7 +14,10 @@ ModelCategory = Literal["MODEL", "DATASET", "CODE"]
 
 @dataclass(slots=True)
 class ScoreTarget:
-    """Represents a model entry to score along with auxiliary artifacts."""
+    """
+    Represents a model entry to score along with auxiliary artifacts.
+    Holds model, dataset, and code URLs.
+    """
 
     model_url: str
     dataset_urls: list[str] = field(default_factory=list)
@@ -20,7 +26,10 @@ class ScoreTarget:
 
 @dataclass(slots=True)
 class RepoFile:
-    """Metadata describing a file stored inside a Hugging Face repository."""
+    """
+    Metadata describing a file stored inside a Hugging Face repository.
+    Includes path and size.
+    """
 
     path: str
     size_bytes: int | None
@@ -28,7 +37,10 @@ class RepoFile:
 
 @dataclass(slots=True)
 class ModelMetadata:
-    """Subset of Hugging Face model metadata required for scoring."""
+    """
+    Subset of Hugging Face model metadata required for scoring.
+    Includes repo_id, display_name, card_data, and stats.
+    """
 
     repo_id: str
     display_name: str
@@ -102,5 +114,3 @@ class EvaluationOutcome:
 
     metrics: dict[str, MetricResult]
     failures: list[MetricFailure]
-
-

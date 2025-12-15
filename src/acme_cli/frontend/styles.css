@@ -1,0 +1,74 @@
+/* Styles for ACME Registry frontend. */
+/* prettier, more readable layout and larger centered cards for screenshots */
+
+* { box-sizing: border-box; }
+body {
+	font-family: "Segoe UI", Roboto, Arial, sans-serif;
+	margin: 0;
+	color: #222;
+	background: #f6f7fb;
+}
+
+header {
+	background: #0b5fff;
+	color: #fff;
+	padding: 16px 20px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+header h1 { margin: 0; font-size: 18px; }
+nav a { color: #fff; margin-left: 12px; text-decoration: none; padding: 6px 8px; border-radius: 6px }
+nav a:hover { background: rgba(255,255,255,0.12) }
+nav a:focus-visible, button:focus-visible { outline: 3px solid #ffd54f; outline-offset: 2px }
+
+/* Main container is wider and centered so cards look larger for screenshots */
+main { padding: 28px; max-width: 1100px; margin: 20px auto }
+
+section.intro { background: #fff; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06) }
+
+.card {
+	background: #fff;
+	border-radius: 8px;
+	padding: 16px;
+	margin: 14px 0;
+	box-shadow: 0 2px 6px rgba(12,18,40,0.06);
+		display: flex;
+		align-items: flex-start;
+	gap: 12px;
+	max-width: 900px; /* center single cards */
+	margin-left: auto;
+	margin-right: auto;
+}
+
+/* Use when the card should stack its children vertically (forms, long content) */
+.card.stacked {
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.card h3 { margin: 0 0 8px 0 }
+.card p { margin: 0; color: #444 }
+
+button { background: #0b5fff; color: #fff; border: 0; padding: 8px 10px; border-radius: 6px; cursor: pointer }
+button:focus { box-shadow: 0 0 0 3px rgba(11,95,255,0.12) }
+button.secondary { background: #e5e7ef; color: #0b1033 }
+button.ghost { background: transparent; border: 1px solid #d7d9e6; color: #0b1033 }
+
+.controls { display: flex; gap: 8px; flex-wrap: wrap }
+small.muted { color: #6b7280 }
+
+/* Inputs fill available space; .row sets a larger second column for inputs + buttons */
+input[type=text], input[type=url], textarea, select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #d7d9e6; background: #fff }
+input:focus, textarea:focus, select:focus { outline: 3px solid #ffd54f; outline-offset: 2px }
+label { font-weight: 600; display: block; margin: 10px 0 6px }
+.row { display: grid; grid-template-columns: 1fr 220px; gap: 12px; align-items: end }
+
+/* Model list: larger minimum width so each card has room */
+#model-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px; justify-items: center }
+
+footer { padding: 12px; text-align: center; color: #6b7280; font-size: 13px; margin-top: 30px }
+
+/* Utility for screen-reader-only text */
+.visually-hidden { position: absolute !important; height: 1px; width: 1px; overflow: hidden; clip: rect(1px, 1px, 1px, 1px); white-space: nowrap }
