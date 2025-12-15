@@ -850,3 +850,65 @@ async def get_artifact_cost(artifact_type: str, id: int, dependency: bool = Fals
     
     return JSONResponse(content=result, status_code=200) 
     # return cost as json
+
+
+# Load test: spawn N concurrent clients to download a model
+@router.post("/artifact/model/{id}/load-test")
+async def run_model_load_test(
+    id: int,
+    num_clients: int = 100,
+    timeout: int = 30
+) -> JSONResponse:
+    """
+    Run a load test on a model by spawning N concurrent clients to download it.
+    
+    This simulates real-world usage patterns and measures:
+    - Success rate
+    - Throughput (MB/s)
+    - Download duration
+    - Errors
+    
+    Args:
+        id: Model artifact ID
+        num_clients: Number of concurrent download clients (default 100)
+        timeout: Download timeout per client in seconds (default 30)
+    
+    Returns:
+        Load test results with statistics
+    """
+    from acme_cli.load_test import run_load_test_sync
+    
+    # Validate artifact exists and is a model
+    if id not in artifacts_metadata:
+        return Response(status_code=404)
+    
+    meta = artifacts_metadata[id]
+    if meta.get("type") != "model":
+        return Response(status_code=400)
+    
+    # Get the download URL
+    download_url = meta.get("download_url")
+    if not download_url:
+        return Response(status_code=400)
+    
+    try:
+        # Run the load test
+        logger.info(f"Starting load test for model {id} with {num_clients} clients")
+        result = run_load_test_sync(
+            model_id=str(id),
+            model_url=download_url,
+            num_clients=num_clients,
+            timeout=timeout
+        )
+        
+        # Return results
+        return JSONResponse(
+            content=result.to_dict(),
+            status_code=200
+        )
+    except Exception as e:
+        logger.error(f"Load test failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Load test execution failed: {str(e)}"
+        )

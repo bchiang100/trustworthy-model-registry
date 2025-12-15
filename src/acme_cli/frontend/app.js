@@ -183,6 +183,42 @@ async function doReset(){
   }catch(e){ console.error('doReset', e); alert('Reset failed: ' + (e.message||e)); }
 }
 
+// Load test: Spawn N concurrent clients to download a model
+async function runLoadTest(modelId, numClients=100){
+  if(!modelId) return alert('Model ID required');
+  if(!confirm(`Run load test with ${numClients} concurrent clients downloading this model?`)) return;
+  
+  const resultEl = document.getElementById('load-test-result');
+  if(resultEl) resultEl.innerHTML = '<p class="muted">Running load test...</p>';
+  
+  try{
+    const res = await fetch(`${API_BASE}/artifact/model/${encodeURIComponent(modelId)}/load-test?num_clients=${numClients}&timeout=30`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    if(!res.ok){
+      const txt = await res.text(); throw new Error(txt||res.statusText);
+    }
+    const data = await res.json();
+    const msg = `
+      <div class="card" style="background:#f0fff0">
+        <h3>✅ Load Test Complete</h3>
+        <p><strong>Model ID:</strong> ${escapeHtml(data.model_id)}</p>
+        <p><strong>Clients:</strong> ${data.num_clients}</p>
+        <p><strong>Success Rate:</strong> ${data.success_rate_percent.toFixed(1)}% (${data.successful_downloads}/${data.num_clients})</p>
+        <p><strong>Duration:</strong> ${data.duration_seconds.toFixed(2)}s</p>
+        <p><strong>Throughput:</strong> ${data.throughput_mbps.toFixed(2)} MB/s</p>
+        <p><strong>Total Downloaded:</strong> ${(data.total_bytes_downloaded / (1024*1024)).toFixed(2)} MB</p>
+        ${data.errors.length > 0 ? `<p><small class="muted">Errors: ${data.errors.slice(0,3).join('; ')}</small></p>` : ''}
+      </div>
+    `;
+    if(resultEl) resultEl.innerHTML = msg;
+    else alert('Load test passed: ' + data.success_rate_percent.toFixed(1) + '% success');
+  }catch(err){
+    console.error('runLoadTest error', err);
+    const msg = `<p class="muted" style="color:red">Load test failed: ${escapeHtml(err.message||err)}</p>`;
+    if(resultEl) resultEl.innerHTML = msg;
+    else alert('Load test failed: ' + (err.message||err));
+  }
+}
+
 // On index load, render list from API
 window.addEventListener('DOMContentLoaded',()=>{
   renderList('model-list');
@@ -195,3 +231,4 @@ window.deleteModel = deleteModel;
 window.doIngest = doIngest;
 window.performLicenseCheck = performLicenseCheck;
 window.enumerateSearch = function(term, containerId){ enumerateSearch(term, containerId); };
+window.runLoadTest = runLoadTest;
