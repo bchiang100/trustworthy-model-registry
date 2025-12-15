@@ -11,7 +11,6 @@
     <h1>Model — Mock UI</h1>
     <nav>
       <a href="index.html">Home</a>
-      <a href="upload.html">Upload</a>
       <a href="ingest.html">Ingest</a>
       <a href="license_check.html">License Check</a>
       <a href="enumerate.html">Enumerate / Search</a>
@@ -56,7 +55,11 @@
             </div>
             <div style="display:flex;flex-direction:column;gap:8px">
               <button class="ghost" onclick="deleteModel('${m.id}')">Delete</button>
+<<<<<<< Updated upstream
               <a href="upload.html"><button class="secondary">Upload another</button></a>
+=======
+              <button class="ghost" onclick="runLoadTest('${m.id}', 100)" style="background:#fff8f0">🔥 Load Test (100 clients)</button>
+>>>>>>> Stashed changes
               <a href="/api/v1/models/${encodeURIComponent(m.id)}/download"><button>Download</button></a>
             </div>
           `;
