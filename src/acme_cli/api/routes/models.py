@@ -191,33 +191,43 @@ async def get_health():
 
 # query artifacts
 @router.post("/artifacts")
-async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
+async def get_artifacts(request: List[QueryRequest] | QueryRequest, offset: int = Query(0, ge=0)):
+    queries: List[QueryRequest] = [request] if isinstance(request, QueryRequest) else request
     pagination_offset: int = int(offset)
 
-    # enumerate all artifacts in the registry metadata up to pagination size or end of registry
-    if len(request) == 1 and request[0].name == "*":
-        artifacts = []
-        for id in artifact_ids[pagination_offset:min(pagination_offset+PAGINATION_SIZE, len(artifacts_metadata))]:
-            name = artifacts_metadata[id]["name"]
-            type = artifacts_metadata[id]["type"]
-            artifacts.append({"name": name, "id": id, "type": type})
-        headers = {offset: str(pagination_offset + len(artifacts))}
-        return JSONResponse(content=artifacts, headers=headers, status_code=200)
+    # Build full, de-duplicated match list in stable (ingest) order
+    matches: list[dict] = []
+    seen_ids: set[int] = set()
 
-    # parse each query request, search for matches by name and then validate type 
-    artifacts = [] 
-    for query in request:
-        name = query.name
-        types = query.types
-        for id in artifact_name_to_id.get(name, []):
-            artifact = artifacts_metadata[id]
-            if artifact["type"] in types or types == None: 
-                type = artifacts_metadata[id]["type"]
-                artifacts.append({"name": name, "id": id, "type": type})
-    headers = {offset: str(pagination_offset + len(artifacts))}
+    # enumerate all artifacts in the registry metadata
+    if len(queries) == 1 and queries[0].name == "*":
+        for artifact_id in artifact_ids:
+            meta = artifacts_metadata.get(artifact_id)
+            if not meta:
+                continue
+            matches.append({"name": meta.get("name"), "id": artifact_id, "type": meta.get("type")})
+    else:
+        for artifact_id in artifact_ids:
+            if artifact_id in seen_ids:
+                continue
+            meta = artifacts_metadata.get(artifact_id)
+            if not meta:
+                continue
+            meta_name = meta.get("name")
+            meta_type = meta.get("type")
+            for q in queries:
+                if q.name != meta_name:
+                    continue
+                if q.types is None or (meta_type in q.types):
+                    matches.append({"name": meta_name, "id": artifact_id, "type": meta_type})
+                    seen_ids.add(artifact_id)
+                    break
 
-    # return artifact matches 
-    return JSONResponse(content=artifacts, headers=headers, status_code=200)
+    # paginate
+    page = matches[pagination_offset : pagination_offset + PAGINATION_SIZE]
+    next_offset = pagination_offset + len(page)
+    headers = {"offset": str(next_offset)}
+    return JSONResponse(content=page, headers=headers, status_code=200)
 
 # reset registry (remove all entries)
 @router.delete("/reset")
