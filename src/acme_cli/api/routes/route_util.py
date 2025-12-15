@@ -1,4 +1,5 @@
 import base64
+import os
 from urllib.parse import urlparse, urlunparse 
 import hashlib
 import re
@@ -16,7 +17,7 @@ HEADERS = {
 # detects if a string is a single url of valid format and http(s)
 def validate_url_string(url: str) -> bool:
     url = url.strip()
-    matches = re.findall(URL_REGEX) 
+    matches = re.findall(URL_REGEX, url) 
     if len(matches) == 0 or len(matches) > 1:
         return False 
     else:
@@ -76,11 +77,15 @@ def parse_github_repo_url(url: str) -> tuple[bool, str, str]:
 
 # checks that repo is public and exists
 def is_valid_repo(owner: str, repo: str) -> bool:
-    r = requests.get(
-        f"{GITHUB_API}/repos/{owner}/{repo}",
-        headers=HEADERS,
-        timeout=10,
-    )
+    timeout = int(os.getenv("ACME_README_TIMEOUT", "2"))
+    try:
+        r = requests.get(
+            f"{GITHUB_API}/repos/{owner}/{repo}",
+            headers=HEADERS,
+            timeout=timeout,
+        )
+    except Exception:
+        return False
 
     if r.status_code == 404:
         return False
@@ -93,15 +98,19 @@ def is_valid_repo(owner: str, repo: str) -> bool:
     if data.get("private"):
         return False
 
-    return True 
+    return True
 
 # fetches readme from repo
 def fetch_readme(owner: str, repo: str) -> tuple[bool, str]:
-    r = requests.get(
-        f"{GITHUB_API}/repos/{owner}/{repo}/readme",
-        headers=HEADERS,
-        timeout=10,
-    )
+    timeout = int(os.getenv("ACME_README_TIMEOUT", "2"))
+    try:
+        r = requests.get(
+            f"{GITHUB_API}/repos/{owner}/{repo}/readme",
+            headers=HEADERS,
+            timeout=timeout,
+        )
+    except Exception:
+        return False, ''
 
     if r.status_code == 404:
         return False, ''
@@ -117,17 +126,34 @@ def fetch_readme(owner: str, repo: str) -> tuple[bool, str]:
     content = base64.b64decode(data["content"]).decode("utf-8", errors="replace")
     return True, content
 
-def get_github_readme(repo_url: str) -> tuple[bool, str]:
+def get_github_readme(repo_url: str, timeout: int | None = None) -> tuple[bool, str]:
+    """Fetch README for a GitHub repo.
+
+    If `timeout` is provided it will override the default `ACME_README_TIMEOUT`.
+    Returns (valid, readme_text).
+    """
     good_url, owner, repo = parse_github_repo_url(repo_url)
     if not good_url:
         return False, ''
 
-    good_repo = is_valid_repo(owner, repo)  # validates repo existence and visibility
-    if not good_repo:
-        return False, ''
+    # allow overriding timeout via env or explicit argument
+    if timeout is not None:
+        prev = os.getenv("ACME_README_TIMEOUT")
+        os.environ["ACME_README_TIMEOUT"] = str(timeout)
+    try:
+        good_repo = is_valid_repo(owner, repo)  # validates repo existence and visibility
+        if not good_repo:
+            return False, ''
 
-    good_readme, readme = fetch_readme(owner, repo)
-    if not good_readme:
-        return False, ''
+        good_readme, readme = fetch_readme(owner, repo)
+        if not good_readme:
+            return False, ''
 
-    return True, readme 
+        return True, readme
+    finally:
+        # restore previous env var if we changed it
+        if timeout is not None:
+            if prev is None:
+                os.environ.pop("ACME_README_TIMEOUT", None)
+            else:
+                os.environ["ACME_README_TIMEOUT"] = prev

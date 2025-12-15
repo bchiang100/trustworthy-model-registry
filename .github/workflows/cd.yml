@@ -1,81 +1,39 @@
-name: CD Pipeline
+name: Deploy ACME API
 
-# Trigger deployment only on pushes to main branch
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  deploy-staging:
+  deploy:
     runs-on: ubuntu-latest
-    environment: staging
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.11"
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::ACCOUNT_ID:role/GitHubActionsEC2Deploy
+          aws-region: us-east-1
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
-
-    - name: Build package
-      run: |
-        python -m pip install build
-        python -m build
-
-    # Add AWS deployment steps here when ready
-    - name: Deploy to staging (placeholder)
-      run: |
-        echo "Deploying to staging environment..."
-        echo "Package built successfully: $(ls dist/)"
-        echo "Ready for AWS Lambda deployment"
-
-    # Notify team of successful deployment
-    - name: Deployment notification
-      run: |
-        echo "Staging deployment completed successfully"
-        echo "Application available at: [staging-url-here]"
-
-  deploy-production:
-    runs-on: ubuntu-latest
-    needs: deploy-staging
-    environment: production
-    # Only deploy to production if manually approved
-    if: github.event_name == 'workflow_dispatch'
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.11"
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
-
-    - name: Build package
-      run: |
-        python -m pip install build
-        python -m build
-
-    # Add production AWS deployment steps here
-    - name: Deploy to production (placeholder)
-      run: |
-        echo "Deploying to production environment..."
-        echo "Package built successfully: $(ls dist/)"
-        echo "Ready for production AWS Lambda deployment"
-
-    - name: Production deployment notification
-      run: |
-        echo "Production deployment completed successfully"
-        echo "Application available at: [production-url-here]"
+      - name: Run command on EC2 via SSM
+        run: |
+          aws ssm send-command \
+            --targets "Key=InstanceIds,Values=i-0123456789abcdef0" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy ACME API" \
+            --parameters 'commands=[
+              "cd /home/ec2-user/acme_app",
+              "git reset --hard",
+              "git pull origin main",
+              "source venv/bin/activate",
+              "pip install -r requirements.txt",
+              "sudo systemctl daemon-reload",
+              "sudo systemctl restart acme.service"
+            ]'

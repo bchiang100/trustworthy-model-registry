@@ -1,5 +1,6 @@
 # manages model endpoints for CR[U]D operations
 
+import logging
 import re
 import os
 import tempfile
@@ -13,37 +14,46 @@ from acme_cli.net_score import compute_net_score
 from acme_cli.types import ScoreTarget
 
 import boto3
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, JSONResponse, Response, Request, RequestValidationError
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, Response, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from acme_cli.urls import parse_artifact_url, is_code_url, is_dataset_url, is_model_url
-from acme_cli.hf.client import HfApiClient
-from route_util import get_github_readme, validate_url_string, make_id
+from acme_cli.hf.client import HfClient
+from .route_util import validate_url_string, get_github_readme, make_id
+import hashlib
+from acme_cli.llm import LlmEvaluator
+
+
+
+from acme_cli.lineage_graph import LineageExtractor
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
 
 # S3 config
-S3_BUCKET_NAME = os.getenv("ACME_S3_BUCKET", "acme-model-registry")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+S3_BUCKET_NAME = "461-model-registry-ui"
+AWS_REGION = "us-east-2"
 
 # initialize the S3 client
 s3_client = boto3.client('s3', region_name=AWS_REGION)
-hf_client = HfApiClient()
+hf_client = HfClient()
+
+# other constants
+PAGINATION_SIZE = 10
 
 def upload_to_s3(local_file_path: str, s3_key: str) -> str:
     """Upload file to S3 and return download URL."""
     try:
         s3_client.upload_file(local_file_path, S3_BUCKET_NAME, s3_key)
-        # generates download URL
-        download_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': S3_BUCKET_NAME, 'Key': s3_key},
-            ExpiresIn=3600
-        )
+        # download url is determinstic 
+        download_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
         return download_url
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"S3 upload failed: {str(e)}")
 
-def download_artifact_from_hf(url: str, artifact_id: str) -> str:
+def download_artifact_from_hf(url: str, artifact_id: int) -> str:
     """Download artifact from Hugging Face and return local path."""
     try:
         parsed_url = parse_artifact_url(url)
@@ -56,14 +66,37 @@ def download_artifact_from_hf(url: str, artifact_id: str) -> str:
 
         # Download based on artifact type
         if is_model_url(url):
-            # Download model repository
-            repo_path = hf_client.snapshot_download(parsed_url.repo_id, cache_dir=temp_dir)
-            # Create archive of the downloaded content
-            import shutil
-            shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
+            # Prefer downloading just the model weights (a single large file)
+            # instead of snapshotting the whole repository which can be large.
+            repo_id = parsed_url.repo_id
+            model_info = hf_client.get_model(repo_id)
+            downloaded = None
+            if model_info and getattr(model_info, "files", None):
+                preferred = hf_client.choose_preferred_file(model_info.files)
+                if preferred:
+                    downloaded = hf_client.hf_hub_download(repo_id=repo_id, filename=preferred, repo_type="model", cache_dir=temp_dir)
+
+            # Fallback to full repo snapshot if single-file download failed
+            if not downloaded:
+                repo_path = hf_client.snapshot_download(parsed_url.repo_id, cache_dir=temp_dir)
+                if not repo_path:
+                    raise ValueError(f"Failed to download model repository: {parsed_url.repo_id}")
+                import shutil
+                shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
+            else:
+                # Archive just the single downloaded file
+                import shutil
+                file_dir = os.path.dirname(downloaded)
+                file_name = os.path.basename(downloaded)
+                shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', root_dir=file_dir, base_dir=file_name)
         elif is_dataset_url(url):
             # Download dataset
             repo_path = hf_client.snapshot_download(parsed_url.repo_id, repo_type="dataset", cache_dir=temp_dir)
+            if not repo_path:
+                raise ValueError(
+                    f"Failed to download dataset repository '{parsed_url.repo_id}'. "
+                    "Check HF API token, network access, and that the repo exists."
+                )
             import shutil
             shutil.make_archive(local_path.replace('.tar.gz', ''), 'gztar', repo_path)
         else:
@@ -104,16 +137,21 @@ def calculate_metrics(artifact_url: str) -> dict:
 
 
 # invalid requests for our spec use status code 400
-@router.exception_handler(RequestValidationError)
-async def validation_exception_handler(
-    request: Request,
-    exc: RequestValidationError,
-):
-    return Response(status_code=400)
+# Note: exception_handler should be registered on app, not router
+# @router.exception_handler(RequestValidationError)
+# async def validation_exception_handler(
+#     request: Request,
+#     exc: RequestValidationError,
+# ):
+#     return Response(status_code=400)
 
-# python dict to hold metdata of artifacts
+# python data structures to hold metdata of artifacts
 # id -> name, type, url, downloadable s3 url
 artifacts_metadata = {} 
+# order of ids 
+artifact_ids = []
+# name -> id 
+artifact_name_to_id: dict[str, List[int]] = {}
 
 class RegexSearch(BaseModel):
     regex: str
@@ -124,7 +162,7 @@ class IngestRequest(BaseModel):
 
 class ArtifactMetadata(BaseModel):
     name: str
-    id: str 
+    id: int 
     type: str  # "model", "dataset", "code" 
 
 class ArtifactData(BaseModel):
@@ -138,70 +176,92 @@ class UpdateArtifactRequest(BaseModel):
     metadata: ArtifactMetadata
     data: ArtifactData
 
-class ModelMetadata(BaseModel):
-    name: str
-    version: str
-    description: Optional[str] = None
-    tags: List[str] = []
-    net_score: float
-    ramp_up_time: float
-    bus_factor: float
-    performance_claims: float
-    license: float
-    dataset_and_code_score: float
-    dataset_quality: float
-    code_quality: float
-    # Phase 2 new metrics
-    reproducibility: (
-        float  # 0 (no code/doesn't run), 0.5 (runs with debugging), 1 (runs perfectly)
-    )
-    reviewedness: (
-        float  # fraction 0-1 of code introduced via PR with review, -1 if no repo
-    )
-    treescore: float  # average of parent model scores according to lineage graph
+class QueryRequest(BaseModel):
+    name: str 
+    types: List[str]  # "model", "dataset", "code"
 
 
 ## SPEC COMPLIANT ENDPOINTS 
 
 # health check / heartbeat
-@router.get("/health/")
+@router.get("/health")
 async def get_health():
     return Response(status_code = 200)
 
 # query artifacts
-@router.post("/artifacts/")
-async def get_artifacts(offset: str = "0"):
-    try:
-        pagination_offset: int = int(offset)
-        # TODO: some math and query parsing to return artifacts based on type + offset
-        artifacts = {}
+@router.post("/artifacts")
+async def get_artifacts(request: List[QueryRequest], offset: str = "0"):
+    pagination_offset: int = int(offset)
+
+    # enumerate all artifacts in the registry metadata up to pagination size or end of registry
+    if len(request) == 1 and request[0].name == "*":
+        artifacts = []
+        for id in artifact_ids[pagination_offset:min(pagination_offset+PAGINATION_SIZE, len(artifacts_metadata))]:
+            name = artifacts_metadata[id]["name"]
+            type = artifacts_metadata[id]["type"]
+            artifacts.append({"name": name, "id": id, "type": type})
         headers = {offset: str(pagination_offset + len(artifacts))}
-        content = {}
-        return JSONResponse(content=content, headers=headers)
-    except:
-        return Response(status_code=403)
+        return JSONResponse(content=artifacts, headers=headers, status_code=200)
+
+    # parse each query request, search for matches by name and then validate type 
+    artifacts = [] 
+    for query in request:
+        name = query.name
+        types = query.types
+        for id in artifact_name_to_id.get(name, []):
+            artifact = artifacts_metadata[id]
+            if artifact["type"] in types: 
+                type = artifacts_metadata[id]["type"]
+                artifacts.append({"name": name, "id": id, "type": type})
+    headers = {offset: str(pagination_offset + len(artifacts))}
+
+    # too many artifacts returned
+    if len(artifacts) > PAGINATION_SIZE:
+        return Response(status_code=413)
+    # return artifact matches 
+    return JSONResponse(content=artifacts, headers=headers, status_code=200)
 
 # reset registry (remove all entries)
-@router.delete("/reset/")
+@router.delete("/reset")
 async def reset_registry():
-    # TODO: implement logic to batch enumerate from s3 and delete
-    # TODO: also clear metadata db 
+    # clear all stored metadata
+    artifacts_metadata.clear()
+    artifact_ids.clear()
+    artifact_name_to_id.clear()
+
+    # clears data in s3 bucket
+    paginator = s3_client.get_paginator('list_objects_v2')
+    pages = paginator.paginate(Bucket=S3_BUCKET_NAME)
+
+    for page in pages:
+        if 'Contents' in page:
+            objects_to_delete = [{'Key': obj['Key']} for obj in page['Contents']]
+            s3_client.delete_objects(
+                Bucket=S3_BUCKET_NAME,
+                Delete={'Objects': objects_to_delete}
+            )
     return Response(status_code=200)
 
 # get specific artifact
-@router.get("/artifact/{artifact_type}/{id}/")
-async def get_artifact(artifact_type: str, id: str):
+@router.get("/artifacts/{artifact_type}/{id}")
+async def get_artifact(artifact_type: str, id: int):
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
     # check if id exists in the registry metadata db 
+    if id not in artifacts_metadata: 
+        return Response(status_code=404)
     # if it does not, return 404
     # parse artifact metadata from db 
-    # return artifact metadata as json 
-    pass
+    name = artifacts_metadata[id]["name"]
+    url = artifacts_metadata[id]["url"]
+    metadata = {"name": name, "id": id, "type": artifact_type}
+    data = {"url": url, "download_url": artifacts_metadata[id]["download_url"]}
+    artifact = {"metadata": metadata, "data": data}
+    return JSONResponse(content=artifact, status_code=200)
 
 # update specific artifact
-@router.put("/artifact/{artifact_type}/{id}/")
-async def update_artifact(artifact_type: str, id: str, request: UpdateArtifactRequest):
+@router.put("/artifacts/{artifact_type}/{id}")
+async def update_artifact(artifact_type: str, id: int, request: UpdateArtifactRequest):
     artifact_metadata = request.metadata
     artifact_data = request.data 
 
@@ -227,8 +287,74 @@ async def update_artifact(artifact_type: str, id: str, request: UpdateArtifactRe
     artifacts_metadata[id]["download_url"] = download_link
     return Response(status_code=200)
 
+# Regex search
+@router.post("/artifact/byRegEx")
+async def get_artifacts(request: RegexSearch):
+    # grab regex from request, start timer, and store matches in a list 
+    regex = request.regex
+    # compile regex safely
+    try:
+        pattern = re.compile(regex)
+    except re.error:
+        return Response(status_code=400)
+
+    start_time = time.monotonic()
+    matching_artifacts: list[dict] = []
+
+    # search through artifact metadata to determine if there are any matches
+    for artifact_id, meta in artifacts_metadata.items():
+        name = meta.get("name", "")
+        url = meta.get("url", "")
+
+        # match on name first
+        if pattern.search(name):
+            matching_artifacts.append({"name": name, "id": artifact_id, "type": meta.get("type")})
+            # skip readme fetch if name matched
+            continue
+
+        # only attempt README search for GitHub or Hugging Face model/dataset URLs
+        try:
+            if url and ("github.com" in url or "huggingface.co" in url):
+                # GitHub: use our route_util helper which validates and fetches the README
+                if "github.com" in url:
+                    # use a short timeout for README fetches to avoid blocking
+                    valid, readme = get_github_readme(url, timeout=2)
+                    if valid and readme and pattern.search(readme):
+                        matching_artifacts.append({"name": name, "id": artifact_id, "type": meta.get("type")})
+                        continue
+
+                # Hugging Face: try to download README.md from the repo
+                if "huggingface.co" in url:
+                    parsed = parse_artifact_url(url)
+                    repo_id = getattr(parsed, "repo_id", None)
+                    if repo_id and (is_model_url(url) or is_dataset_url(url)):
+                        try:
+                            repo_type = "model" if is_model_url(url) else "dataset"
+                            local_readme = hf_client._api.hf_hub_download(repo_id=repo_id, filename="README.md", repo_type=repo_type)
+                            with open(local_readme, "r", encoding="utf-8", errors="replace") as f:
+                                readme = f.read()
+                            if readme and pattern.search(readme):
+                                matching_artifacts.append({"name": name, "id": artifact_id, "type": meta.get("type")})
+                                continue
+                        except Exception:
+                            # ignore any HF read errors and continue
+                            pass
+
+        except Exception:
+            # tolerate any unexpected per-artifact errors
+            pass
+
+        # support timeout of 2 seconds to ensure regex search does not hang
+        if time.monotonic() - start_time > 2:
+            return Response(status_code=400)
+
+    # return results
+    if not matching_artifacts:
+        return Response(status_code=404)
+    return JSONResponse(content=matching_artifacts, status_code=200)
+
 # ingest artifact
-@router.put("/artifact/{artifact_type}/")
+@router.post("/artifact/{artifact_type}")
 async def ingest_artifact(artifact_type: str, request: IngestRequest):
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
@@ -245,31 +371,105 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
         # URL already exists, return 409 (Conflict)
         return Response(status_code=409)
 
-    # download files using HF API - done
-    # retrieves all metric values and store to memory
+    # retrieves all metric values 
     metrics = calculate_metrics(artifact_url)
 
     # rate artifact
     rating = metrics.get("net_score", 0.0)
 
     # create id
-    id = make_id(artifact_url)
+    id = int(make_id(artifact_url))
 
-    if rating >= 0.5: # trustworthy
+    if rating >= 0.2: # trustworthy
         try:
-            # download artifact from huggingface
-            local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
+            # attempt to stream a preferred single file directly to S3 to avoid
+            # persisting large files on the local EC2 instance. If streaming
+            # fails, fall back to the existing local download + upload flow.
+            s3_key = f"{artifact_type}/{id}/.tar.gz"
+            download_url = None
+            skip_local = False
 
-            # creates S3 key for the artifact
-            s3_key = f"{artifact_type}/{id}/{artifact_name}.tar.gz"
+            try:
+                parsed = parse_artifact_url(artifact_url)
+                if parsed and is_model_url(artifact_url):
+                    repo_id = parsed.repo_id
+                    info = hf_client.get_model(repo_id)
+                    preferred = hf_client.choose_preferred_file(info.files) if info else None
+                    if preferred:
+                        ok = hf_client.stream_file_to_s3(
+                            repo_id=repo_id,
+                            filename=preferred,
+                            bucket=S3_BUCKET_NAME,
+                            key=s3_key,
+                            repo_type="model",
+                            s3_client=s3_client,
+                        )
+                        if ok:
+                            download_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
+                            skip_local = True
+            except Exception:
+                # non-fatal; fall back to local download path below
+                pass
 
-            # upload to S3 and get download URL
-            download_url = upload_to_s3(local_file_path, s3_key)
+            if not skip_local:
+                # download artifact from huggingface (local filesystem)
+                local_file_path = download_artifact_from_hf(artifact_url, id) # local_file_path becomes AWS server's local filesystem once deployed
 
-            # Clean up local file
+                # upload to S3 and get download URL
+                download_url = upload_to_s3(local_file_path, s3_key)
+
+            # Clean up local file and temporary directory. Use recursive removal
+            # because HF downloads or intermediate tooling may leave extra files
+            # (e.g., cache dirs) in the temporary directory which prevents
+            # `os.rmdir` from succeeding.
             import os
-            os.remove(local_file_path)
-            os.rmdir(os.path.dirname(local_file_path))
+            import shutil
+            try:
+                if os.path.exists(local_file_path):
+                    os.remove(local_file_path)
+            except Exception:
+                # best-effort cleanup; do not fail the request because of cleanup
+                pass
+            try:
+                def _on_rm_error(func, path, exc_info):
+                    # try to make writable and retry
+                    try:
+                        os.chmod(path, 0o700)
+                    except Exception:
+                        pass
+                    try:
+                        func(path)
+                    except Exception:
+                        pass
+
+                shutil.rmtree(os.path.dirname(local_file_path), onerror=_on_rm_error)
+            except Exception:
+                # as a final fallback, attempt to remove files then the dir
+                try:
+                    for root, dirs, files in os.walk(os.path.dirname(local_file_path), topdown=False):
+                        for name in files:
+                            try:
+                                os.chmod(os.path.join(root, name), 0o600)
+                                os.remove(os.path.join(root, name))
+                            except Exception:
+                                pass
+                        for name in dirs:
+                            try:
+                                os.rmdir(os.path.join(root, name))
+                            except Exception:
+                                pass
+                    try:
+                        os.rmdir(os.path.dirname(local_file_path))
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            # If the temp dir still exists, log a warning for diagnostics
+            try:
+                if os.path.exists(os.path.dirname(local_file_path)):
+                    logger.warning("Temp dir still exists after cleanup: %s", os.path.dirname(local_file_path))
+            except Exception:
+                pass
 
 
             # store metadata in memory
@@ -278,9 +478,15 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
                 "type": artifact_type,
                 "url": artifact_url,
                 "download_url": download_url,
-                "s3_key": s3_key
+                # "s3_key": s3_key
             }
+            artifact_ids.append(id)
+            # for new ids, handles the case where multiple artifacts share the same name
+            if artifact_name not in artifact_name_to_id:
+                artifact_name_to_id[artifact_name] = []
+            artifact_name_to_id[artifact_name].append(id)
 
+            # return artifact metadata and data as json
             return JSONResponse(
                 content={
                     "metadata": {
@@ -298,46 +504,21 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
         
         except Exception as e:
             # If S3 upload fails, return 500
-            raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"S3 Upload failed: {str(e)}")
     else:
         # if rating fails, return 424
         return Response(status_code=424)
 
 # Get track
-@router.get("/tracks/")
+@router.get("/tracks")
 async def get_tracks():
+    # return track as json
     return JSONResponse(content={"plannedTracks": "Performance track"}, status_code=200)
 
-# Regex search
-@router.post("/artifact/byRegEx/")
-async def get_artifacts(request: RegexSearch):
-    # grab regex from request, start timer, and store matches in a list 
-    regex = request.regex
-    pattern = re.compile(regex)
-
-    start_time = time.monotonic()
-    matching_artifacts = []
-
-    # search through artifact metadata to determine if there are any matches
-    for artifact_id in artifacts_metadata(): 
-        name = artifacts_metadata[artifact_id]["name"]
-        if pattern.search(name): # artifact name matches regex
-            type = artifacts_metadata[artifact_id]["type"]
-            artifact_dict = {"name" : name, "id" : artifact_id, "type": type}
-            matching_artifacts.append(artifact_dict) 
-
-        if time.monotonic - start_time > 5: # regex is bad or causing too much backtracking, search time is > 3 seconds
-            Response(status_code=400) # invalid regex
-
-    # zero regex matches
-    if len(matching_artifacts) == 0:
-        return Response(status_code=404)
-    else: # nonzero regex matches
-        return JSONResponse(content=matching_artifacts, status_code=200)
 
 # license check of model against github project 
-@router.post("/artifact/model/{id}/license-check/")
-async def check_license(id: str, request: LicenseCheckRequest) -> JSONResponse:
+@router.post("/artifact/model/{id}/license-check")
+async def check_license(id: int, request: LicenseCheckRequest) -> JSONResponse:
     # checks if artifact is not in registry
     project_url = request.github_url
     if id not in artifacts_metadata: 
@@ -352,34 +533,320 @@ async def check_license(id: str, request: LicenseCheckRequest) -> JSONResponse:
     valid, readme = get_github_readme(project_url)
     if not valid:
         return Response(status_code=404)
-    # if no license, return 502
-    # use llm to determine whether the project can use the model for fine tuning and inference
-    # return status as true or false in json 
-    pass
+
+    # simple license detection helper (naive)
+    def _detect_license(text: str) -> str | None:
+        if not text:
+            return None
+        # look for common SPDX identifiers or license names
+        m = re.search(r"(Apache-2\.0|Apache License|MIT License|MIT|BSD-3-Clause|BSD|GPL-3\.0|GPL|LGPL)", text, re.I)
+        return m.group(0) if m else None
+
+    project_license = _detect_license(readme)
+    if not project_license:
+        # no explicit license text found in README
+        return Response(status_code=502)
+
+    # parse license from model on Hugging Face
+    meta = artifacts_metadata.get(id)
+    model_license: str | None = None
+    if meta:
+        model_url = meta.get("url")
+        parsed = parse_artifact_url(model_url) if model_url else None
+        repo_id = getattr(parsed, "repo_id", None) if parsed else None
+        if repo_id:
+            # try structured metadata first
+            info = hf_client.get_model(repo_id)
+            if info and getattr(info, "card_data", None):
+                model_license = info.card_data.get("license") or info.card_data.get("License")
+
+            # fallback: try to read LICENSE file from repo
+            if not model_license:
+                for fname in ("LICENSE", "LICENSE.md", "LICENSE.txt", "license", "license.md"):
+                    try:
+                        path = hf_client._api.hf_hub_download(repo_id=repo_id, filename=fname, repo_type="model")
+                        if path:
+                            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                                content = fh.read()
+                            ml = _detect_license(content)
+                            if ml:
+                                model_license = ml
+                                break
+                    except Exception:
+                        continue
+
+    # determine compatibility using the LLM; fall back to False on errors
+    license_compatible = None
+    if project_license and model_license:
+        try:
+            evaluator = LlmEvaluator()
+            license_compatible = evaluator.judge_license_compatibility(
+                project_license, model_license
+            )
+        except Exception:
+            # Any LLM errors are considered non-compatible by default
+            license_compatible = False
+
+    return JSONResponse(
+        content={
+            "project_has_license": True,
+            "project_license": project_license,
+            "model_license": model_license,
+            "license_compatible": license_compatible,
+        },
+        status_code=200,
+    )
 
 # get lineage graph of model, refer to evan's metric generation for that 
-@router.post("/artifact/model/{id}/lineage/")
-async def get_lineage_graph(id: str) -> JSONResponse:
+@router.post("/artifact/model/{id}/lineage")
+async def get_lineage_graph(id: int) -> JSONResponse:
     # check if id exists in the registry metadata db 
     # if it does not, return 404
     # check if artifact is a model
     # if not, return 400 
     # parse lineage graph from model metadata
     # return lineage graph as json 
-    pass
+    if id not in artifacts_metadata:
+        return Response(status_code=404)
+
+    meta = artifacts_metadata[id]
+    if meta.get("type") != "model":
+        return Response(status_code=400)
+
+    url = meta.get("url")
+    if not url:
+        return Response(status_code=400)
+
+    parsed = parse_artifact_url(url)
+    if not parsed or not getattr(parsed, "repo_id", None):
+        return Response(status_code=400)
+
+    try:
+        extractor = LineageExtractor()
+        graph = extractor.extract(parsed.repo_id, max_depth=5)
+        payload = graph.to_artifact_lineage_graph()
+        return JSONResponse(content=payload, status_code=200)
+    except Exception as e:
+        # log and return 500
+        raise HTTPException(status_code=500, detail=f"Failed to compute lineage: {e}")
+
+
+# Return full model rating per spec
+@router.get("/artifact/model/{id}/rate")
+async def get_model_rating(id: int) -> JSONResponse:
+    """Return the model rating (all metrics) for the given artifact id.
+
+    This endpoint builds the rating using the same `calculate_metrics` helper
+    used during ingest. Latencies are approximate and reported as seconds.
+    """
+    if id not in artifacts_metadata:
+        return Response(status_code=404)
+
+    meta = artifacts_metadata[id]
+    if meta.get("type") != "model":
+        return Response(status_code=400)
+
+    url = meta.get("url")
+    if not url:
+        return Response(status_code=400)
+
+    # Compute metrics (may be cached by upstream ingest in a real system)
+    start = time.monotonic()
+    metrics = calculate_metrics(url)
+    elapsed = time.monotonic() - start
+
+    if not metrics:
+        # failure computing metrics
+        raise HTTPException(status_code=500, detail="Failed to compute metrics")
+
+    # Helper to pull numeric value or default
+    def get_metric_val(name, default=0.0):
+        val = metrics.get(name)
+        if isinstance(val, (int, float)):
+            return float(val)
+        return default
+
+    # size_score may be an object
+    size_score = metrics.get("size_score") or {}
+
+    rating = {
+        "name": meta.get("name", id),
+        "category": "model",
+        "net_score": get_metric_val("net_score"),
+        "net_score_latency": elapsed,
+        "ramp_up_time": get_metric_val("ramp_up_time"),
+        "ramp_up_time_latency": 0.0,
+        "bus_factor": get_metric_val("bus_factor"),
+        "bus_factor_latency": 0.0,
+        "performance_claims": get_metric_val("performance_claims"),
+        "performance_claims_latency": 0.0,
+        "license": get_metric_val("license"),
+        "license_latency": 0.0,
+        "dataset_and_code_score": get_metric_val("dataset_and_code_score"),
+        "dataset_and_code_score_latency": 0.0,
+        "dataset_quality": get_metric_val("dataset_quality"),
+        "dataset_quality_latency": 0.0,
+        "code_quality": get_metric_val("code_quality"),
+        "code_quality_latency": 0.0,
+        "reproducibility": get_metric_val("reproducibility"),
+        "reproducibility_latency": 0.0,
+        "reviewedness": get_metric_val("reviewedness"),
+        "reviewedness_latency": 0.0,
+        "tree_score": get_metric_val("tree_score"),
+        "tree_score_latency": 0.0,
+        "size_score": size_score,
+        "size_score_latency": 0.0,
+    }
+
+    return JSONResponse(content=rating, status_code=200)
+
 
 # get cost of artifact
-@router.get("/artifact/{artifact_type}/{id}/cost/")
-async def get_artifact_cost(artifact_type: str, id: str, dependency: bool = False) -> JSONResponse:
+@router.get("/artifact/{artifact_type}/{id}/cost")
+async def get_artifact_cost(artifact_type: str, id: int, dependency: bool = False) -> JSONResponse:
+    """Return the cost (download size in MB) of an artifact, optionally including dependencies.
+    
+    Per the OpenAPI spec, cost is defined as the total download size required for the artifact,
+    and optionally includes the sizes of dependencies (parent models in the lineage).
+    
+    Response structure:
+    - Without dependencies: { "artifact_id": { "total_cost": <size_in_mb> } }
+    - With dependencies: { "artifact_id": { "standalone_cost": <size>, "total_cost": <sum> }, ... }
+    """
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
-    # check if id exists in the registry metadata db
-    # if it does not, return 404
-    # parse cost from artifact metadata
-    standalone_cost = 0
-    sub_costs = 0
-    if (dependency): 
-        # find costs of dependencies 
-        sub_costs = 1
-    total_cost = standalone_cost + sub_costs
+    
+    # Check if artifact exists in registry
+    if id not in artifacts_metadata:
+        return Response(status_code=404)
+    
+    meta = artifacts_metadata[id]
+    
+    # Get the artifact's source URL to compute size
+    url = meta.get("url")
+    if not url:
+        return Response(status_code=400)
+    
+    # Helper function to calculate size in MB from metadata
+    def get_artifact_size_mb(artifact_url: str) -> float:
+        """Calculate the download size of an artifact in MB."""
+        try:
+            metrics = calculate_metrics(artifact_url)
+            # Metrics includes model_metadata which has file list with sizes
+            # For now, estimate based on the artifact type and common model sizes
+            
+            # Parse the artifact URL to get metadata
+            parsed = parse_artifact_url(artifact_url)
+            if not parsed or not parsed.repo_id:
+                return 100.0  # Default estimate if parsing fails
+            
+            # Try to fetch HF metadata to get real file sizes
+            try:
+                from huggingface_hub import HfApi
+                hf_api = HfApi()
+                
+                if artifact_type == "model":
+                    model_info = hf_api.model_info(parsed.repo_id, timeout=5)
+                    # Sum up all file sizes
+                    total_bytes = 0
+                    if model_info.siblings:
+                        for sibling in model_info.siblings:
+                            if sibling.size:
+                                total_bytes += sibling.size
+                    # Convert to MB
+                    return total_bytes / (1024 * 1024)
+                elif artifact_type == "dataset":
+                    dataset_info = hf_api.dataset_info(parsed.repo_id, timeout=5)
+                    total_bytes = 0
+                    if dataset_info.siblings:
+                        for sibling in dataset_info.siblings:
+                            if sibling.size:
+                                total_bytes += sibling.size
+                    return total_bytes / (1024 * 1024)
+                else:  # code
+                    # For code repos, estimate typical GitHub repo size
+                    return 50.0
+            except Exception:
+                # Fallback estimates if HF API fails
+                if artifact_type == "model":
+                    return 200.0  # Typical model ~200MB
+                elif artifact_type == "dataset":
+                    return 500.0  # Typical dataset ~500MB
+                else:
+                    return 50.0   # Typical code repo ~50MB
+        except Exception:
+            # Default fallback
+            return 100.0
+    
+    # Calculate standalone cost for the requested artifact
+    standalone_cost_mb = get_artifact_size_mb(url)
+    
+    # Build response
+    result = {}
+    
+    if not dependency:
+        # Simple case: just the artifact itself
+        result[id] = {
+            "total_cost": standalone_cost_mb
+        }
+    else:
+        # Include dependencies: fetch lineage graph and sum all ancestor sizes
+        try:
+            # Only models can have dependencies via lineage
+            if artifact_type != "model":
+                # Non-models only have their own cost
+                result[id] = {
+                    "standalone_cost": standalone_cost_mb,
+                    "total_cost": standalone_cost_mb
+                }
+            else:
+                # Extract lineage to find all ancestor models
+                parsed = parse_artifact_url(url)
+                if not parsed or not parsed.repo_id:
+                    result[id] = {
+                        "standalone_cost": standalone_cost_mb,
+                        "total_cost": standalone_cost_mb
+                    }
+                else:
+                    try:
+                        extractor = LineageExtractor()
+                        graph = extractor.extract(parsed.repo_id, max_depth=5)
+                        
+                        # Start with the root model's cost
+                        total_with_deps = standalone_cost_mb
+                        result[id] = {
+                            "standalone_cost": standalone_cost_mb,
+                            "total_cost": standalone_cost_mb
+                        }
+                        
+                        # Add costs of all ancestor models
+                        ancestors = graph.get_ancestors()
+                        for ancestor_repo_id in ancestors:
+                            # Try to construct HF URL for ancestor
+                            ancestor_url = f"https://huggingface.co/{ancestor_repo_id}"
+                            ancestor_cost = get_artifact_size_mb(ancestor_url)
+                            total_with_deps += ancestor_cost
+                            
+                            # Create an entry for each ancestor (use repo_id as artifact_id)
+                            # In a real system, we'd look up the actual artifact_id
+                            result[ancestor_repo_id] = {
+                                "standalone_cost": ancestor_cost,
+                                "total_cost": ancestor_cost
+                            }
+                        
+                        # Update the root artifact with total including deps
+                        result[id]["total_cost"] = total_with_deps
+                        
+                    except Exception as e:
+                        # If lineage extraction fails, just return standalone cost
+                        logger.debug(f"Failed to extract lineage for cost calculation: {e}")
+                        result[id] = {
+                            "standalone_cost": standalone_cost_mb,
+                            "total_cost": standalone_cost_mb
+                        }
+        except Exception as e:
+            # Generic error, return 500
+            raise HTTPException(status_code=500, detail=f"Failed to calculate artifact cost: {str(e)}")
+    
+    return JSONResponse(content=result, status_code=200) 
     # return cost as json

@@ -9,8 +9,15 @@ __pycache__
 *.pyd
 *.so
 
+# ignore editor files
+.vscode/*
+# ignore random scripts 
+scripts/*
+
+
 # Ignore Python virtual environment
 .venv
+*.env
 
 # Ignore Python build files
 build
@@ -24,3 +31,10 @@ htmlcov
 
 # Ignore Python virtual environment
 venv
+
+# Ignore environment files
+*.env
+*.env.example
+*.env.local
+*.env.staging
+.env
