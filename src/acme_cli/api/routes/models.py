@@ -31,6 +31,21 @@ from acme_cli.lineage_graph import LineageExtractor
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+@router.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # If the missing or invalid parameter is 'id' in the path, return 400
+    for err in exc.errors():
+        if err["loc"][0] == "path":
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Bad request: missing or invalid path parameter"}
+            )
+    # fallback to default 422
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()}
+    )
+
 
 # S3 config
 S3_BUCKET_NAME = "461-model-registry-ui"
@@ -244,7 +259,9 @@ async def reset_registry():
 
 # get specific artifact
 @router.get("/artifacts/{artifact_type}/{id}")
-async def get_artifact(artifact_type: str, id: int):
+async def get_artifact(artifact_type: str, id: int | None):
+    if id == None:
+        return Response(status_code=400)
     if artifact_type not in ["model", "dataset", "code"]:
         return Response(status_code=400)
     # check if id exists in the registry metadata db 
