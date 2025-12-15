@@ -98,7 +98,8 @@ class SizeMetric(Metric):
             api = HfApi()
 
             try:
-                model_info = api.model_info(model_id)
+                # Use repo_info with files_metadata=True to get actual file sizes (instead of api.model_info(model_id)) didnt include file sizes beforei
+                model_info = api.repo_info(model_id, files_metadata=True)
                 total_size = 0
 
                 for sibling in model_info.siblings:

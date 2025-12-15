@@ -24,6 +24,19 @@ class DatasetQualityMetric(Metric):
     def compute(self, context: ModelContext) -> float:
         metadata = context.dataset_metadata
         if not metadata:
+            # If no metadata but we have dataset URLs, give some base quality score
+            if context.target.dataset_urls:
+                from acme_cli.urls import parse_artifact_url
+                base_score = 0.0
+                for url in context.target.dataset_urls:
+                    parsed = parse_artifact_url(url)
+                    if parsed.platform == "huggingface":
+                        base_score = max(base_score, 0.4)  # HF datasets are generally good quality
+                    elif parsed.platform in {"github", "gitlab"}:
+                        base_score = max(base_score, 0.3)  # Code repos may have datasets
+                    else:
+                        base_score = max(base_score, 0.2)  # Other sources
+                return base_score
             return 0.0
 
         size_component = self._size_component(metadata.size_bytes)
