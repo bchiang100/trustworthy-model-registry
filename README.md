@@ -1,47 +1,23 @@
 # ACME Trustworthy Model Registry
 
-This repository implements Phase 2 of the ECE46100 ACME Corporation Model Registry. This tool allows for clients to upload, download, search, and interact with models to the registry through both a programmatic RESTful API and a frontend interface. All models requested for ingestion are first rated to ensure they meet minimum standards of quality for ACME. 
+This repository implements Phase 2 of the ECE46100 ACME Corporation Model Registry. This tool allows for clients to upload, download, search, and interact with models to the registry through both a programmatic RESTful API and a frontend interface. All models requested for ingestion additionally have ratings corresponding to their quality to determine if they meet minimum standards for ACME. 
 
 ## Getting Started
-
-1. Install dependencies (user site-packages):
-   ```bash
-   ./run install
-   ```
-2. Score models using a newline-delimited URL file:
-   ```bash
-   ./run /absolute/path/to/urls.txt
-   ```
-3. Execute the test suite with coverage:
-   ```bash
-   ./run test
-   ```
-
-### URL File Format
-
-Provide one artifact URL per line. Dataset and code URLs should precede the model URL they describe. Example:
-```
-https://huggingface.co/datasets/acme/demo-dataset
-https://github.com/acme/model-repo
-https://huggingface.co/acme/demo-model
-```
-Only model URLs emit NDJSON output; datasets and code are used to enrich the metrics.
+API: http://3.22.117.94/api/v1 
+Web UI: http://13.58.108.214/
 
 ## Runtime Configuration
 
 - `LOG_FILE`: absolute path for log output. Defaults to stderr when unset.
 - `HUGGINGFACEHUB_API_TOKEN` / `HF_API_TOKEN`: token used for Hugging Face Hub and Inference API calls. Required to exercise the LLM-backed metric at scale.
-- `ACME_LLM_MODEL`: optional override for the Hugging Face inference model (default `meta-llama/Llama-3.2-1B-Instruct`) used to analyze READMEs.
-- `ACME_MAX_WORKERS`: overrides the metric evaluation thread pool size; important as metrics are calculated concurrently.
+- `GITHUB_TOKEN`: token used for GitHub API for metrics to retrieve repository information.
 
-## NDJSON Schema (Table 1 Compliance)
+## Ratings
 
-Each line in the scoring output exposes the following fields:
+Each line in the scoring exposes the following fields:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `name` | string | Display name or repo ID of the model |
-| `category` | string | Always `MODEL` for emitted rows |
 | `net_score` | float | Weighted aggregate of all sub-metrics |
 | `*_latency` | int | Milliseconds to compute the paired metric |
 | `ramp_up_time` | float | Documentation clarity (LLM-assisted) |
@@ -52,6 +28,9 @@ Each line in the scoring output exposes the following fields:
 | `dataset_and_code_score` | float | Presence and quality of linked datasets/code |
 | `dataset_quality` | float | Dataset governance, size, and documentation |
 | `code_quality` | float | Static code health heuristics on the cloned repo |
+| `reviewedness` | float | Percent of repository code that comes from pull requests|
+| `reproducibility` | float | How easily the code in a README for an artifact can be executed (potentially with AI agentic assistance) |
+| `tree_score` | float | The average of the scores for artifacts in the lineage graph of this artifact |
 
 Latencies are rounded to milliseconds as required.
 
@@ -65,7 +44,7 @@ Latencies are rounded to milliseconds as required.
 
 ## Testing & Quality
 
-- `pytest` with coverage (`./run test`) achieves ~90% line coverage across the CLI.
+- `pytest` with coverage (`./run test`) achieves high coverage across all core functionalities.
 - Tests mock external services and the LLM to avoid network dependencies.
 - Critical components (URL parsing, context building, metrics, registry, runner, scoring pipeline) are unit tested.
 
