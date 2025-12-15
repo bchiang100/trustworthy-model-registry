@@ -39,9 +39,15 @@ class PerformanceClaimsMetric(Metric):
             "eval",
             "evaluation",
             "leaderboard",
+            "performance",
+            "score",
+            "metric",
+            "test",
+            "validation",
         ]
         count = contains_keywords(readme, keywords)
-        return clamp(count / 10.0)
+        # More generous scoring: 5 keywords = 1.0 score instead of 10
+        return clamp(count / 5.0)
 
 
 __all__ = ["PerformanceClaimsMetric"]

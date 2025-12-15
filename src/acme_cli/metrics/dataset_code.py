@@ -24,18 +24,28 @@ class DatasetAndCodeMetric(Metric):
             if word_count(context.dataset_readme_text) > 200:
                 score += 0.2
         elif dataset_urls:
-            score += 0.3  # at least referenced even if not on Hugging Face
+            # Give higher scores for quality dataset platforms
+            dataset_score = 0.0
+            for url in dataset_urls:
+                parsed = parse_artifact_url(url)
+                if parsed.platform == "huggingface":
+                    dataset_score = max(dataset_score, 0.7)  # Higher for HF datasets
+                elif parsed.platform in {"github", "gitlab"}:
+                    dataset_score = max(dataset_score, 0.5)
+                else:
+                    dataset_score = max(dataset_score, 0.3)
+            score += dataset_score
 
         if code_urls:
             quality_bonus = 0.0
             for url in code_urls:
                 parsed = parse_artifact_url(url)
                 if parsed.platform in {"github", "gitlab"}:
-                    quality_bonus = max(quality_bonus, 0.4)
+                    quality_bonus = max(quality_bonus, 0.5)  # Higher for git repos
                 elif parsed.platform == "huggingface":
-                    quality_bonus = max(quality_bonus, 0.3)
+                    quality_bonus = max(quality_bonus, 0.4)  # Higher for HF repos
                 else:
-                    quality_bonus = max(quality_bonus, 0.2)
+                    quality_bonus = max(quality_bonus, 0.3)  # Higher for others
             score += quality_bonus
 
         return clamp(score)

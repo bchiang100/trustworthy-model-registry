@@ -33,15 +33,21 @@ class RampUpMetric(Metric):
     @staticmethod
     def _heuristic_score(readme: str) -> float:
         wc = word_count(readme)
-        richness = clamp(wc / 1000.0)
+        # More generous scoring for shorter documentation
+        # 200 words gets 0.5, 500 words gets 0.8, 1000+ words gets 1.0
+        if wc < 200:
+            richness = clamp(wc / 400.0)  # More generous for short docs
+        else:
+            richness = clamp(0.5 + (wc - 200) / 1600.0)  # 0.5 base + scaling
+
         keyword_bonus = (
-            0.1
+            0.2  # Increased from 0.1
             if contains_keywords(
-                readme, ["installation", "usage", "quickstart", "example"]
+                readme, ["installation", "usage", "quickstart", "example", "how to", "getting started"]
             )
             else 0.0
         )
-        code_bonus = min(0.2, count_code_fences(readme) * 0.05)
+        code_bonus = min(0.3, count_code_fences(readme) * 0.1)  # Increased bonus for code examples
         return clamp(richness + keyword_bonus + code_bonus)
 
 
