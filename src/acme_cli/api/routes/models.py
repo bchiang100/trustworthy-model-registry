@@ -380,7 +380,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
     # create id
     id = int(make_id(artifact_url))
 
-    if rating >= 0.2: # trustworthy
+    if rating >= 0: # trustworthy
         try:
             # attempt to stream a preferred single file directly to S3 to avoid
             # persisting large files on the local EC2 instance. If streaming
@@ -513,7 +513,7 @@ async def ingest_artifact(artifact_type: str, request: IngestRequest):
 @router.get("/tracks")
 async def get_tracks():
     # return track as json
-    return JSONResponse(content={"plannedTracks": "Performance track"}, status_code=200)
+    return JSONResponse(content={"planned_tracks": "performance track"}, status_code=200)
 
 
 # license check of model against github project 
