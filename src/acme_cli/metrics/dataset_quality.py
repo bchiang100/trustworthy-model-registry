@@ -31,7 +31,7 @@ class DatasetQualityMetric(Metric):
                 for url in context.target.dataset_urls:
                     parsed = parse_artifact_url(url)
                     if parsed.platform == "huggingface":
-                        base_score = max(base_score, 0.4)  # HF datasets are generally good quality
+                        base_score = max(base_score, 0.6)  # HF datasets are generally good quality
                     elif parsed.platform in {"github", "gitlab"}:
                         base_score = max(base_score, 0.3)  # Code repos may have datasets
                     else:

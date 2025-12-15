@@ -29,7 +29,7 @@ class DatasetAndCodeMetric(Metric):
             for url in dataset_urls:
                 parsed = parse_artifact_url(url)
                 if parsed.platform == "huggingface":
-                    dataset_score = max(dataset_score, 0.7)  # Higher for HF datasets
+                    dataset_score = max(dataset_score, 0.8)  # Higher for HF datasets
                 elif parsed.platform in {"github", "gitlab"}:
                     dataset_score = max(dataset_score, 0.5)
                 else:
