@@ -32,6 +32,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from acme_cli.api.middleware import MetricsMiddleware
 from acme_cli.api.routes import models, health
@@ -70,11 +71,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             )
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
-@app.get("/")
-async def root():
-    """Root endpoint returning basic API information."""
-    return {
-        "message": "ACME Trustworthy Model Registry API",
-        "version": "0.1.0",
-        "status": "operational",
-    }
+
+# Serve static frontend at root
+app.mount("/", StaticFiles(directory="src/acme_cli/frontend", html=True), name="static")
