@@ -598,7 +598,7 @@ async def check_license(id: int, request: LicenseCheckRequest) -> JSONResponse:
     )
 
 # get lineage graph of model, refer to evan's metric generation for that 
-@router.post("/artifact/model/{id}/lineage")
+@router.get("/artifact/model/{id}/lineage")
 async def get_lineage_graph(id: int) -> JSONResponse:
     # check if id exists in the registry metadata db 
     # if it does not, return 404
