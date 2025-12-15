@@ -17,15 +17,23 @@ if [ ! -f "pyproject.toml" ]; then
     exit 1
 fi
 
-# Check if virtual environment exists
-if [ ! -d "venv" ]; then
-    echo "Creating Python virtual environment..."
-    python3.10 -m venv venv || python3 -m venv venv
+
+# Check if virtual environment exists (.venv)
+if [ ! -d ".venv" ]; then
+    echo "Creating Python virtual environment in .venv..."
+    py -m venv .venv || python -m venv .venv
 fi
 
 # Activate virtual environment
 echo "Activating virtual environment..."
-source venv/bin/activate
+if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+elif [ -f ".venv/Scripts/activate" ]; then
+    source .venv/Scripts/activate
+else
+    echo "Could not find .venv activation script."
+    exit 1
+fi
 
 # Install dependencies
 echo "Installing/updating dependencies..."

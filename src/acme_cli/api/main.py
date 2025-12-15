@@ -30,6 +30,8 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 
 from acme_cli.api.middleware import MetricsMiddleware
 from acme_cli.api.routes import models, health
@@ -57,6 +59,9 @@ app.include_router(
 app.include_router(
     models.router, prefix="/api/v1", tags=["models"]
 )  # adds model endpoints
+
+frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
+app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
 
 
 @app.get("/")
