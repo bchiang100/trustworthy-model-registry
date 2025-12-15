@@ -31,27 +31,27 @@ class DatasetQualityMetric(Metric):
                 for url in context.target.dataset_urls:
                     parsed = parse_artifact_url(url)
                     if parsed.platform == "huggingface":
-                        base_score = max(base_score, 0.6)  # HF datasets are generally good quality
+                        base_score = max(base_score, 0.8)  # HF datasets are generally good quality
                     elif parsed.platform in {"github", "gitlab"}:
-                        base_score = max(base_score, 0.3)  # Code repos may have datasets
+                        base_score = max(base_score, 0.5)  # Code repos may have datasets
                     else:
-                        base_score = max(base_score, 0.2)  # Other sources
+                        base_score = max(base_score, 0.4)  # Other sources
 
                 # Additional boost points even without metadata
                 bonus_points = 0.0
 
                 # Boost for multiple dataset sources
                 if len(context.target.dataset_urls) > 1:
-                    bonus_points += 0.1
+                    bonus_points += 0.15
 
                 # Boost for having model documentation that might describe dataset
                 if context.readme_text and len(context.readme_text.strip()) > 200:
-                    bonus_points += 0.15
+                    bonus_points += 0.2
 
                 # Boost for well-known dataset names in URLs
                 url_text = " ".join(context.target.dataset_urls).lower()
                 if any(name in url_text for name in ["wikitext", "squad", "glue", "imagenet", "coco"]):
-                    bonus_points += 0.1
+                    bonus_points += 0.2
 
                 return clamp(base_score + bonus_points)
             return 0.0
@@ -71,13 +71,13 @@ class DatasetQualityMetric(Metric):
             org in dataset_readme + " " + dataset_id
             for org in ["anthropic", "openai", "google", "microsoft", "meta"]
         ):
-            organization_bonus = 1.0
+            organization_bonus = 1.2
         # High-quality AI companies and platforms
         elif any(
             org in dataset_readme + " " + dataset_id
             for org in ["huggingface", "deepseek", "alibaba", "tongyi"]
         ):
-            organization_bonus = 0.9
+            organization_bonus = 1.1
         # Research institutions and quality dataset indicators
         elif any(
             indicator in dataset_readme + " " + dataset_id
@@ -93,7 +93,7 @@ class DatasetQualityMetric(Metric):
                 "harmless",
             ]
         ):
-            organization_bonus = 0.8
+            organization_bonus = 1.0
         # General quality indicators for good datasets
         elif any(
             keyword in dataset_readme
@@ -105,7 +105,7 @@ class DatasetQualityMetric(Metric):
                 "validated",
             ]
         ):
-            organization_bonus = 0.6
+            organization_bonus = 0.8
 
         governance_component = 0.0
         license_values: list[str] = []
@@ -135,14 +135,14 @@ class DatasetQualityMetric(Metric):
 
         # Boost for comprehensive metadata
         if metadata.tags and len(metadata.tags) >= 3:
-            bonus_points += 0.1  # Well-tagged datasets
+            bonus_points += 0.2  # Well-tagged datasets
 
         # Boost for good documentation length
         readme_length = len(context.dataset_readme_text or "")
         if readme_length > 500:
-            bonus_points += 0.1
+            bonus_points += 0.15
         elif readme_length > 1000:
-            bonus_points += 0.15  # Extra boost for very detailed docs
+            bonus_points += 0.2  # Extra boost for very detailed docs
 
         # Boost for recent updates (if available in metadata)
         if hasattr(metadata, 'last_modified') and metadata.last_modified:
