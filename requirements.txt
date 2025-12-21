@@ -1,4 +1,4 @@
-boto3==1.42.9
+boto3==1.42.14
 fastapi==0.124.4
 huggingface_hub==1.2.3
 psutil==7.1.3
